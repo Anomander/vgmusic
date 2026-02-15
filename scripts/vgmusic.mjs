@@ -3,7 +3,9 @@ import { MusicController } from './music-controller.mjs';
 import {
   getSceneControlButtons,
   handleCanvasReady,
+  handleCreateCombatant,
   handleDeleteCombat,
+  handleDeleteCombatant,
   handleReady,
   handleSceneConfigRender,
   handleTokenConfigRender,
@@ -30,4 +32,6 @@ Hooks.on('canvasReady', handleCanvasReady);
 Hooks.on('updateScene', handleUpdateScene);
 Hooks.on('updateActor', handleUpdateActor);
 Hooks.on('updateToken', handleUpdateToken);
+Hooks.on('createCombatant', handleCreateCombatant);
+Hooks.on('deleteCombatant', handleDeleteCombatant);
 Hooks.on('renderTokenApplication', handleTokenConfigRender);

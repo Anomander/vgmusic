@@ -13,6 +13,8 @@
   "VGMusic.PlaylistSection.Area": "Area Music",
   "VGMusic.PlaylistSection.Combat": "Combat Music",
   "VGMusic.Priority": "Priority",
+  "VGMusic.Settings.FadeDuration.Hint": "Duration in seconds for crossfading between tracks. Set to 0 to use each sound's individual fade setting.",
+  "VGMusic.Settings.FadeDuration.Name": "Fade Duration",
   "VGMusic.Settings.DefaultMusic.Hint": "Configure default music for various situations",
   "VGMusic.Settings.DefaultMusic.Label": "Configure Default Music",
   "VGMusic.Settings.DefaultMusic.Name": "Default Music",

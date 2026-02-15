@@ -3,7 +3,7 @@
  */
 export const CONST = {
   moduleId: 'vgmusic',
-  settings: { silentCombatMusicMode: 'silentCombatMusicMode', defaultMusic: 'defaultMusic', suppressArea: 'suppressArea', suppressCombat: 'suppressCombat' },
+  settings: { silentCombatMusicMode: 'silentCombatMusicMode', defaultMusic: 'defaultMusic', suppressArea: 'suppressArea', suppressCombat: 'suppressCombat', fadeDuration: 'fadeDuration' },
   silentModes: { highestPriority: 'highestPriority', lastActor: 'lastActor', area: 'area', generic: 'generic' },
   playlistSections: {
     DefaultMusic: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -5 } },

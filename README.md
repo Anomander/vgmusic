@@ -14,118 +14,45 @@ This module was updated as part of a commission. Any further updates beyond new 
 
 [![Discord](https://dcbadge.limes.pink/api/server/PzzUwU9gdz)](https://discord.gg/PzzUwU9gdz)
 
-## Introduction
+## Overview
 
-**Video Game Music** transforms your FoundryVTT experience with dynamic, context-aware audio management that brings your virtual tabletop to life! Just like in video games, music seamlessly transitions between exploration, combat, and dramatic moments, creating an immersive atmosphere that responds to the action.
+Video Game Music adds context-aware music to FoundryVTT. It automatically switches between area and combat music based on game state, tracks playback position so music resumes where it left off, and crossfades between tracks.
 
-Say goodbye to manually managing playlists and hello to intelligent audio that knows when to build tension for combat, provide ambiance for exploration, and resume exactly where it left off when the action calms down.
+## Features
 
----
-
-## Key Features
-
-### 🎵 **Dynamic Music Contexts**
-
-- **Area Music**: Automatic ambient soundscapes for scenes and locations
-- **Combat Music**: Intense battle tracks that activate during encounters
-- **Smart Transitions**: Seamless fade-ins and fade-outs between music contexts
-- **Position Memory**: Music resumes from where it was interrupted
-
-### 🎭 **Per-Actor Combat Themes**
-
-- **Individual Battle Music**: Each actor can have their own signature combat theme
-- **Priority System**: Hierarchical music selection based on current combat focus
-- **Flexible Fallbacks**: Multiple fallback options when actors don't have dedicated themes
-
-### 🎛️ **Advanced Playlist Management**
-
-- **Scene Integration**: Configure area and combat music directly in scene settings
-- **Actor Customization**: Add battle themes through actor sheet controls
-- **Default Music System**: Set fallback music for various situations
-- **Initial Track Selection**: Choose specific starting tracks within playlists
-
-### ⚙️ **Intelligent Audio Control**
-
-- **Silent Combat Modes**: Configurable behavior when combat actors lack dedicated music
-- **Suppression Controls**: Temporarily disable area or combat music with hotkeys
-- **Priority Sorting**: Smart music selection based on context and actor importance
-- **Fade Duration Control**: Customizable transition timing for smooth audio experiences
-
----
+- **Area & Combat Music** — assign playlists per-scene for exploration and combat
+- **Per-Token Themes** — give individual tokens their own combat music via Token Config
+- **Priority System** — control which music wins when multiple sources apply
+- **Fallback Modes** — configurable behavior when the active combatant has no theme
+- **Crossfade** — adjustable fade duration for smooth transitions between tracks
+- **Position Memory** — tracks resume from where they were interrupted
+- **Suppression** — toggle area or combat music on/off with hotkeys or scene controls
 
 ## Installation
 
-Get Video Game Music through Foundry's **Module Manager** for instant setup.
+Install through Foundry's module browser, or paste the manifest URL:
 
-### Manual Installation
+```
+https://github.com/Sayshal/vgmusic/releases/latest/download/module.json
+```
 
-1. Open **Foundry's Configuration and Setup** screen
-2. Click **Install Module** in the Add-on Modules section
-3. Paste this URL in the **Manifest URL** field: [https://github.com/Sayshal/vgmusic/releases/latest/download/module.json](https://github.com/Sayshal/vgmusic/releases/latest/download/module.json)
-4. Click **Install**
-5. Enable Video Game Music in the **Manage Modules** section
+## Setup
 
----
+1. **Scene music** — open Scene Config, click the music configuration button to assign area and combat playlists
+2. **Token music** — open Token Config (or Prototype Token), find the music button in the Identity tab to assign combat themes
+3. **Linked token override** — linked tokens can optionally use their own music instead of the actor's prototype config
+4. **Default music** — set a world-level fallback in module settings
+5. **Settings** — configure silent combat mode, fade duration, and suppression hotkeys
 
-## Configuration
+## Settings
 
-### Quick Setup
+| Setting | Description |
+|---|---|
+| Silent Combat Music Mode | What plays when the active combatant has no theme (highest priority, last actor, area music, or generic combat) |
+| Fade Duration | Crossfade time in seconds (0 = use per-sound fade) |
+| Default Music | World-level fallback combat playlist |
 
-1. **Install and Enable**: Add the module through Foundry's module manager
-2. **Configure Scenes**: Use the music configuration button in scene settings
-3. **Set Actor Themes**: Add battle music through actor sheet controls
-4. **Customize Behavior**: Adjust settings for silent combat modes and suppression
+## Support
 
-### Scene Music Configuration
-
-Access scene audio settings through the scene configuration panel:
-
-- **Music Configuration Button**: Located in the scene settings for easy access
-- **Drag & Drop Interface**: Simply drag playlists from the sidebar to assign them
-- **Track Selection**: Choose specific starting tracks from assigned playlists
-- **Priority Settings**: Control music hierarchy during complex scenarios
-
-### Actor Music Setup
-
-Configure actor battle themes through the actor sheet:
-
-- **Header Controls**: Music configuration button in actor sheet headers
-- **Combat Music Section**: Dedicated interface for assigning battle themes
-- **Priority Configuration**: Set importance levels for music conflicts
-- **Initial Track Selection**: Choose starting points within assigned playlists
-
-### Global Settings
-
-Customize module behavior through world settings:
-
-- **Silent Combat Music Mode**: Choose fallback behavior for actors without themes
-- **Default Music Configuration**: Set system-wide fallback audio
-- **Suppression Controls**: Configure hotkeys for temporary audio control
-
----
-
-## Why Video Game Music?
-
-Traditional tabletop audio management requires constant manual intervention. You have to:
-
-- Remember to start appropriate music for each scene
-- Manually change tracks when combat begins
-- Constantly adjust audio for different situations
-- Deal with jarring transitions and interruptions
-
-**Video Game Music** eliminates these hassles by providing:
-
-- **Automatic Context Detection**: Music changes based on game state without manual intervention
-- **Seamless Transitions**: Smooth fade-ins and fade-outs create professional audio experiences
-- **Position Memory**: Tracks resume exactly where they left off, maintaining audio continuity
-- **Intelligent Prioritization**: Smart selection of appropriate music based on current situation
-- **Flexible Control**: Easy suppression and override options when manual control is needed
-
-Whether you're running a quick one-shot or a complex long-term campaign, Video Game Music creates the atmospheric audio experience your players deserve without the constant management overhead!
-
----
-
-## Support & Community
-
-- **Discord**: [Join our community for support, suggestions, and updates](https://discord.gg/PzzUwU9gdz)
-- **GitHub Issues**: [Report bugs or request features](https://github.com/Sayshal/vgmusic/issues)
+- [Discord](https://discord.gg/PzzUwU9gdz)
+- [GitHub Issues](https://github.com/Sayshal/vgmusic/issues)

@@ -127,56 +127,6 @@ export class FadingTrack {
   }
 
   /**
-   * Start the fade operation
-   */
-  async startFade() {
-    if (!this.track) {
-      this.delete();
-      return;
-    }
-    try {
-      if (this.direction === 'out') await this.fadeOut();
-      else if (this.direction === 'in') await this.fadeIn();
-    } catch (error) {
-      console.error('FadingTrack | Error during fade:', error);
-      if (this.direction === 'out') await this.track.update({ playing: false, pausedTime: null });
-    }
-    this.delete();
-  }
-
-  /**
-   * Perform fade out operation
-   */
-  async fadeOut() {
-    if (!this.track.playing) return;
-    const startVolume = this.track.volume;
-    const steps = 20;
-    const stepDuration = this.fadeDuration / steps;
-    const volumeStep = startVolume / steps;
-    for (let i = 0; i < steps; i++) {
-      const newVolume = Math.max(0, startVolume - volumeStep * (i + 1));
-      await this.track.update({ volume: newVolume });
-      await new Promise((resolve) => setTimeout(resolve, stepDuration));
-    }
-    await this.track.update({ playing: false, pausedTime: null, volume: startVolume });
-  }
-
-  /**
-   * Perform fade in operation
-   */
-  async fadeIn() {
-    const steps = 20; // Number of volume steps
-    const stepDuration = this.fadeDuration / steps;
-    const volumeStep = this.targetVolume / steps;
-    await this.track.update({ volume: 0 });
-    for (let i = 0; i < steps; i++) {
-      const newVolume = Math.min(this.targetVolume, volumeStep * (i + 1));
-      await this.track.update({ volume: newVolume });
-      await new Promise((resolve) => setTimeout(resolve, stepDuration));
-    }
-  }
-
-  /**
    * Remove this fading track from the controller
    */
   delete() {

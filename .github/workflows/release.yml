@@ -71,10 +71,7 @@ jobs:
             templates/ \
             LICENSE \
             module.json \
-            README.md \
-            -x "*.lock" \
-            -x "package*.json" \
-            -x "node_modules/*"
+            README.md
 
       # Fetch existing release body if it exists
       - name: Fetch Release Body

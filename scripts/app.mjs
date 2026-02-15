@@ -574,6 +574,22 @@ export function handleDeleteCombat() {
 }
 
 /**
+ * Handle combatant creation to refresh music
+ * @param {object} combatant - The created combatant
+ */
+export function handleCreateCombatant(combatant) {
+  if (combatant.parent?.started) game.vgmusic?.musicController?.playCurrentTrack();
+}
+
+/**
+ * Handle combatant deletion to refresh music
+ * @param {object} combatant - The deleted combatant
+ */
+export function handleDeleteCombatant(combatant) {
+  if (combatant.parent?.started) game.vgmusic?.musicController?.playCurrentTrack();
+}
+
+/**
  * Handle canvas ready to start music
  */
 export function handleCanvasReady() {
