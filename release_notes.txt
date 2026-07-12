@@ -1,2 +1,18 @@
-**Changes**
-- Dummy release notes for testing ATLAS update messages.
+## Breaking Changes
+
+- Minimum supported Foundry version is now v14; Foundry v13 is no longer supported.
+- Video Game Music now requires the 3DS:ATLAS module; ATLAS must be installed and enabled or the module will not load.
+
+## Bug Fixes
+
+- The "Get In Touch" Discord link on the issue tracker now correctly references Video Game Music instead of another module.
+
+## Changes
+
+- Added a Patreon link to the project's funding options alongside the existing Ko-fi link.
+- English and Portuguese (Brazil) text is now provided through ATLAS instead of bundled with the module.
+- The bug report form now asks for your game system and version (not just D&D) and suggests current examples (Foundry 14.364, dnd5e 6.0.0).
+
+## Documentation
+
+- Rewrote the module description shown in Foundry's package listing to explain the automatic combat/exploration music switching, per-scene and per-token battle themes, and resume-from-where-it-left-off playback.
