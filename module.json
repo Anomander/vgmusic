@@ -22,17 +22,21 @@
   ],
   "flags": {},
   "id": "vgmusic",
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    },
+    {
+      "lang": "pt-BR",
+      "name": "Português (Brasil)",
+      "path": "lang/pt-BR.json"
+    }
+  ],
   "license": "https://github.com/Sayshal/vgmusic?tab=License-1-ov-file",
   "manifest": "https://github.com/Sayshal/vgmusic/releases/latest/download/module.json",
   "readme": "https://github.com/Sayshal/vgmusic?tab=readme-ov-file",
-  "relationships": {
-    "requires": [
-      {
-        "id": "3ds-atlas",
-        "type": "module"
-      }
-    ]
-  },
   "title": "Video Game Music",
   "url": "https://github.com/Sayshal/vgmusic",
   "version": "69.420"

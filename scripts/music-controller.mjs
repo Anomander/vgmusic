@@ -1,5 +1,5 @@
 import { CONST } from './config.mjs';
-import { FadingTrack, isHeadGM, PlaylistContext } from './helpers.mjs';
+import { FadingTrack, isHeadGM, log, PlaylistContext } from './helpers.mjs';
 
 /**
  * Get document type name, treating PrototypeToken as 'Token'
@@ -95,14 +95,19 @@ export class MusicController {
    * @returns {Document|object|null} The document to use for music lookup
    */
   _getCombatantMusicSource(token, actor) {
-    if (!token && !actor) return null;
+    if (!token && !actor) {
+      log(3, '_getCombatantMusicSource: Both token and actor are missing.');
+      return null;
+    }
     const tokenHasMusic = token?.getFlag(CONST.moduleId, 'music.combat.playlist');
     const prototypeToken = actor?.prototypeToken;
     const prototypeHasMusic = prototypeToken?.flags?.[CONST.moduleId]?.music?.combat?.playlist;
     const actorHasMusic = actor?.getFlag(CONST.moduleId, 'music.combat.playlist');
     if (token && !token.actorLink) {
       if (tokenHasMusic) return token;
-      return actorHasMusic ? actor : null;
+      if (actorHasMusic) return actor;
+      log(3, `_getCombatantMusicSource: No combat music override found for unlinked token '${token.name}' or its actor.`);
+      return null;
     }
     if (token && token.actorLink) {
       if (tokenHasMusic) {
@@ -111,7 +116,9 @@ export class MusicController {
       }
       if (prototypeHasMusic) return prototypeToken;
     }
-    return actorHasMusic ? actor : null;
+    if (actorHasMusic) return actor;
+    log(3, `_getCombatantMusicSource: No combat music override found for linked token/actor '${actor?.name || token?.name}'`);
+    return null;
   }
 
   /**
@@ -217,16 +224,32 @@ export class MusicController {
     const allContexts = this.getAllCurrentPlaylists();
     const filteredContexts = allContexts.filter(this.filterPlaylists.bind(this));
     const sortedContexts = filteredContexts.sort(this.sortPlaylists.bind(this));
-    return sortedContexts.length > 0 ? sortedContexts[0] : null;
+    if (sortedContexts.length > 0) {
+      return sortedContexts[0];
+    }
+    log(3, `getCurrentPlaylist: No active playlist contexts found after filtering (total contexts checked: ${allContexts.length}, after filter: ${filteredContexts.length})`);
+    return null;
   }
 
   /**
    * Play the current track based on context
    */
-  async playCurrentTrack() {
-    if (!isHeadGM()) return;
-    const newContext = this.getCurrentPlaylist();
-    await this.playMusic(newContext);
+  playCurrentTrack() {
+    if (!isHeadGM()) {
+      log(3, 'Skipping playCurrentTrack: not head GM');
+      return;
+    }
+    clearTimeout(this._playDebounce);
+    log(3, 'Debouncing track play calculation...');
+    this._playDebounce = setTimeout(async () => {
+      try {
+        const newContext = this.getCurrentPlaylist();
+        log(3, `Resolved current playlist context: ${newContext ? `${newContext.context} - '${newContext.playlist.name}' (track: '${newContext.track?.name || 'Default'}')` : 'None'}`);
+        await this.playMusic(newContext);
+      } catch (error) {
+        log(1, 'Error in debounced playCurrentTrack execution:', error);
+      }
+    }, 50);
   }
 
   /**
@@ -246,11 +269,26 @@ export class MusicController {
    * @param {Document} entity - Entity to save data to
    */
   async savePlaylistData(entity) {
-    if (entity instanceof Combat && !game.combats.get(entity.id)) return;
-    if (!this.currentTrack || !entity || !isHeadGM()) return;
+    if (entity instanceof Combat && !game.combats.get(entity.id)) {
+      log(3, `Skipping savePlaylistData: combat entity '${entity.id}' is no longer active.`);
+      return;
+    }
+    if (!isHeadGM()) {
+      log(3, 'Skipping savePlaylistData: not head GM.');
+      return;
+    }
+    if (!this.currentTrack || !entity) {
+      log(3, 'Skipping savePlaylistData: no current track or invalid entity.');
+      return;
+    }
     const track = this.currentTrack;
     const flagData = { id: track.parent.id, trackId: track.id, start: (track.sound?.currentTime ?? 0) % (track.sound?.duration ?? 100) };
-    await entity.setFlag(CONST.moduleId, `playlist.${track.parent.id}.${track.id}`, flagData);
+    try {
+      await entity.setFlag(CONST.moduleId, `playlist.${track.parent.id}.${track.id}`, flagData);
+      log(3, `Successfully saved playlist position for track '${track.name}' on entity '${entity.name || entity.id}': start=${flagData.start}`);
+    } catch (error) {
+      log(1, `Failed to save playlist position for track '${track.name}' on entity '${entity.name || entity.id}':`, error);
+    }
   }
 
   /**
@@ -258,40 +296,60 @@ export class MusicController {
    * @param {PlaylistContext|null} context - Playlist context to play
    */
   async playMusic(context) {
-    const prevTrack = this.currentTrack;
-    const newTrack = context?.track;
-    const fadeMs = game.settings.get(CONST.moduleId, CONST.settings.fadeDuration) * 1000;
-    const isFading = { prev: this.fadingTracks.some((ft) => ft.track === prevTrack), new: this.fadingTracks.some((ft) => ft.track === newTrack) };
-    if (prevTrack !== newTrack && prevTrack) {
-      await this.savePlaylistData(this.currentContext?.scopeEntity);
-      if (this.isAudioReady()) {
-        if (fadeMs > 0 && prevTrack.sound?.playing) {
-          prevTrack.sound.fade(0, { duration: fadeMs });
-          const track = prevTrack;
-          setTimeout(() => track.update({ playing: false, pausedTime: null }), fadeMs);
-        } else {
-          await prevTrack.update({ playing: false, pausedTime: null });
+    try {
+      const prevTrack = this.currentTrack;
+      const newTrack = context?.track;
+      if (newTrack && prevTrack === newTrack) {
+        log(3, `Track '${newTrack.name}' is already the current track. Skipping playback change.`);
+        this.currentContext = context;
+        return;
+      }
+      const fadeMs = game.settings.get(CONST.moduleId, CONST.settings.fadeDuration) * 1000;
+      const isFading = { prev: this.fadingTracks.some((ft) => ft.track === prevTrack), new: this.fadingTracks.some((ft) => ft.track === newTrack) };
+      
+      log(3, `Transitioning music from '${prevTrack?.name ?? 'None'}' to '${newTrack?.name ?? 'None'}' (context: ${context?.context ?? 'None'}, fade: ${fadeMs}ms)`);
+      
+      if (prevTrack !== newTrack && prevTrack) {
+        await this.savePlaylistData(this.currentContext?.scopeEntity);
+        if (this.isAudioReady()) {
+          if (fadeMs > 0 && prevTrack.sound?.playing) {
+            log(3, `Fading out track '${prevTrack.name}' over ${fadeMs}ms`);
+            prevTrack.sound.fade(0, { duration: fadeMs });
+            const track = prevTrack;
+            setTimeout(() => track.update({ playing: false, pausedTime: null }), fadeMs);
+          } else {
+            log(3, `Stopping track '${prevTrack.name}' immediately`);
+            await prevTrack.update({ playing: false, pausedTime: null });
+          }
+        }
+        const guardMs = fadeMs || prevTrack.fadeDuration;
+        if (guardMs > 0 && !isFading.prev) {
+          log(3, `Adding track '${prevTrack.name}' to fading tracking list for ${guardMs}ms`);
+          this.fadingTracks.push(new FadingTrack(prevTrack, guardMs));
+        }
+        this.currentContext = null;
+      }
+      if (newTrack) {
+        this.currentContext = context;
+        if (!isFading.new) {
+          const startTime = this.currentTrackInfo?.start ?? 0;
+          const shouldFadeIn = fadeMs > 0 && prevTrack;
+          log(3, `Preparing to play track '${newTrack.name}' from position ${startTime}s (fadeIn: ${shouldFadeIn})`);
+          await this.waitForAudio(async () => {
+            if (shouldFadeIn) {
+              const targetVolume = newTrack.volume;
+              log(3, `Fading in track '${newTrack.name}' to volume ${targetVolume} over ${fadeMs}ms`);
+              await newTrack.update({ playing: true, pausedTime: startTime, volume: 0 });
+              this._fadeInWhenReady(newTrack, targetVolume, fadeMs);
+            } else {
+              log(3, `Playing track '${newTrack.name}' immediately`);
+              await newTrack.update({ playing: true, pausedTime: startTime });
+            }
+          });
         }
       }
-      const guardMs = fadeMs || prevTrack.fadeDuration;
-      if (guardMs > 0 && !isFading.prev) this.fadingTracks.push(new FadingTrack(prevTrack, guardMs));
-      this.currentContext = null;
-    }
-    if (newTrack) {
-      this.currentContext = context;
-      if (!isFading.new) {
-        const startTime = this.currentTrackInfo?.start ?? 0;
-        const shouldFadeIn = fadeMs > 0 && prevTrack;
-        await this.waitForAudio(async () => {
-          if (shouldFadeIn) {
-            const targetVolume = newTrack.volume;
-            await newTrack.update({ playing: true, pausedTime: startTime, volume: 0 });
-            this._fadeInWhenReady(newTrack, targetVolume, fadeMs);
-          } else {
-            await newTrack.update({ playing: true, pausedTime: startTime });
-          }
-        });
-      }
+    } catch (error) {
+      log(1, 'Error playing music transition:', error);
     }
   }
 
@@ -302,16 +360,25 @@ export class MusicController {
    * @param {number} fadeMs - Fade duration in milliseconds
    */
   _fadeInWhenReady(track, targetVolume, fadeMs) {
+    clearInterval(this._fadeInPoll);
+    clearTimeout(this._fadeInSafety);
+    log(3, `Waiting for audio node readiness on track '${track.name}' before starting fade`);
     const poll = setInterval(() => {
       if (track.sound?.sourceNode) {
         clearInterval(poll);
+        log(3, `Track '${track.name}' audio ready. Applying volume fade to ${targetVolume} over ${fadeMs}ms.`);
         track.sound.fade(targetVolume, { duration: fadeMs });
-        setTimeout(() => track.update({ volume: targetVolume }), fadeMs);
+        setTimeout(() => {
+          track.update({ volume: targetVolume });
+          log(3, `Completed volume update for track '${track.name}' to ${targetVolume}`);
+        }, fadeMs);
       }
     }, 20);
+    this._fadeInPoll = poll;
     // Safety: restore document volume even if sound never loads
-    setTimeout(() => {
+    this._fadeInSafety = setTimeout(() => {
       clearInterval(poll);
+      log(2, `Safety timeout triggered for track '${track.name}'. Forcing volume ${targetVolume}.`);
       track.update({ volume: targetVolume });
     }, fadeMs + 1000);
   }

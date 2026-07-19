@@ -1,5 +1,6 @@
 import { VGMusicConfig } from './app.mjs';
 import { CONST } from './config.mjs';
+import { log } from './helpers.mjs';
 
 /**
  * Register module settings and configuration menu
@@ -71,6 +72,15 @@ export function registerSettings() {
       game.vgmusic?.musicController?.playCurrentTrack();
     }
   });
+
+  game.settings.register(CONST.moduleId, 'enableDebug', {
+    name: 'VGMusic.Settings.EnableDebug.Name',
+    hint: 'VGMusic.Settings.EnableDebug.Hint',
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false
+  });
 }
 
 /**
@@ -93,7 +103,13 @@ export function registerKeybindings() {
  */
 async function toggleAreaMusic() {
   const current = game.settings.get(CONST.moduleId, CONST.settings.suppressArea);
-  await game.settings.set(CONST.moduleId, CONST.settings.suppressArea, !current);
+  const target = !current;
+  try {
+    await game.settings.set(CONST.moduleId, CONST.settings.suppressArea, target);
+    log(3, `Successfully toggled area music suppression to: ${target}`);
+  } catch (error) {
+    log(1, `Failed to toggle area music suppression to ${target}:`, error);
+  }
   ui.controls.initialize();
 }
 
@@ -102,6 +118,12 @@ async function toggleAreaMusic() {
  */
 async function toggleCombatMusic() {
   const current = game.settings.get(CONST.moduleId, CONST.settings.suppressCombat);
-  await game.settings.set(CONST.moduleId, CONST.settings.suppressCombat, !current);
+  const target = !current;
+  try {
+    await game.settings.set(CONST.moduleId, CONST.settings.suppressCombat, target);
+    log(3, `Successfully toggled combat music suppression to: ${target}`);
+  } catch (error) {
+    log(1, `Failed to toggle combat music suppression to ${target}:`, error);
+  }
   ui.controls.initialize();
 }

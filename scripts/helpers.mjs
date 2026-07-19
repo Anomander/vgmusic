@@ -80,34 +80,60 @@ export class PlaylistContext {
    * @returns {PlaylistContext|null} Created context or null
    */
   static fromDocument(document, type = 'combat', scopeEntity = null) {
+    if (!document) {
+      log(3, `PlaylistContext.fromDocument: Document is null or undefined for type '${type}'`);
+      return null;
+    }
     if (document instanceof foundry.abstract.Document) {
       const playlistId = document.getFlag(CONST.moduleId, `music.${type}.playlist`);
-      const playlist = playlistId ? game.playlists.get(playlistId) : null;
-      if (!playlist) return null;
+      let playlist = playlistId ? game.playlists.get(playlistId) : null;
+      if (!playlist && document.documentName === 'Scene' && type === 'area') {
+        playlist = document.playlist || game.playlists.get(document.playlistId) || null;
+        if (playlist) {
+          log(3, `No VGM override found for scene area music. Falling back to Scene's native playlist: '${playlist.name}'`);
+        }
+      }
+      if (!playlist) {
+        log(3, `PlaylistContext.fromDocument: No playlist override or fallback found on document '${document.name || document.id}' (type: '${type}')`);
+        return null;
+      }
       const trackId = document.getFlag(CONST.moduleId, `music.${type}.initialTrack`) || null;
       const priority = document.getFlag(CONST.moduleId, `music.${type}.priority`) ?? 0;
       return new this(type, document, playlist, trackId, priority, scopeEntity);
     }
     if (document?.constructor?.name === 'PrototypeToken') {
       const section = document.flags?.[CONST.moduleId]?.music?.[type];
-      if (!section) return null;
+      if (!section) {
+        log(3, `PlaylistContext.fromDocument: No music section flags found on PrototypeToken '${document.name || document.id}' (type: '${type}')`);
+        return null;
+      }
       const playlistId = section.playlist;
       const playlist = playlistId ? game.playlists.get(playlistId) : null;
-      if (!playlist) return null;
+      if (!playlist) {
+        log(3, `PlaylistContext.fromDocument: Playlist with ID '${playlistId}' not found for PrototypeToken '${document.name || document.id}' (type: '${type}')`);
+        return null;
+      }
       const trackId = section.initialTrack || null;
       const priority = section.priority ?? 0;
       return new this(type, document, playlist, trackId, priority, scopeEntity);
     }
-    if (document.documentName === 'DefaultMusic') {
+    if (document?.documentName === 'DefaultMusic') {
       const section = document.data?.vgmusic?.music?.[type];
-      if (!section) return null;
+      if (!section) {
+        log(3, `PlaylistContext.fromDocument: No music section found on DefaultMusic (type: '${type}')`);
+        return null;
+      }
       const playlistId = section.playlist;
       const playlist = playlistId ? game.playlists.get(playlistId) : null;
-      if (!playlist) return null;
+      if (!playlist) {
+        log(3, `PlaylistContext.fromDocument: Playlist with ID '${playlistId}' not found for DefaultMusic (type: '${type}')`);
+        return null;
+      }
       const trackId = section.initialTrack || null;
       const priority = section.priority ?? 0;
       return new this(type, document, playlist, trackId, priority, scopeEntity);
     }
+    log(3, `PlaylistContext.fromDocument: Document of type '${document?.constructor?.name || typeof document}' is not supported (type: '${type}')`);
     return null;
   }
 }
@@ -139,3 +165,33 @@ export class FadingTrack {
     }
   }
 }
+
+/**
+ * Portable log function for the module
+ * @param {number} level - Log level (1: error, 2: warn, 3: log)
+ * @param {...*} args - Arguments to log
+ */
+export function log(level, ...args) {
+  const prefix = 'VGMusic |';
+  if (level > 1) {
+    try {
+      const enableDebug = game.settings.get(CONST.moduleId, 'enableDebug');
+      if (!enableDebug) return;
+    } catch (e) {
+      // settings not yet initialized/ready
+    }
+  }
+  switch (level) {
+    case 1:
+      console.error(prefix, ...args);
+      break;
+    case 2:
+      console.warn(prefix, ...args);
+      break;
+    case 3:
+    default:
+      console.log(prefix, ...args);
+      break;
+  }
+}
+

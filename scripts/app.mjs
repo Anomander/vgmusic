@@ -1,5 +1,7 @@
 import { CONST } from './config.mjs';
-import { getProperty } from './helpers.mjs';
+import { getProperty, log } from './helpers.mjs';
+
+const _loc = (key) => game.i18n.localize(key);
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const { DragDrop } = foundry.applications.ux;
@@ -71,6 +73,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   get documentTypeName() {
     if (this.document.documentName) return this.document.documentName;
     if (this.document.constructor.name === 'PrototypeToken') return 'Token';
+    log(2, `VGMusicConfig.documentTypeName: Unknown document class name: ${this.document?.constructor?.name}`);
     return undefined;
   }
 
@@ -82,7 +85,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       const docType = this.documentTypeName;
       const sections = CONST.playlistSections[docType];
       if (!sections) {
-        ATLAS.log(1, 'No sections found for document type:', docType);
+        log(1, 'No sections found for document type:', docType);
         this.config = [];
         return;
       }
@@ -111,7 +114,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       });
       this.config.sort((a, b) => a.order - b.order);
     } catch (error) {
-      ATLAS.log(1, 'Error initializing configuration:', error);
+      log(1, 'Error initializing configuration:', error);
       this.config = [];
     }
   }
@@ -178,7 +181,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       const li = event.currentTarget.closest('li');
       if (!li || li.classList.contains('not-sortable')) {
-        ATLAS.log(1, 'Drag start blocked - not sortable');
+        log(1, 'Drag start blocked - not sortable');
         return false;
       }
       this._formState = this._captureFormState();
@@ -188,7 +191,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       li.classList.add('dragging');
       return true;
     } catch (error) {
-      ATLAS.log(1, 'Error starting drag:', error);
+      log(1, 'Error starting drag:', error);
       return false;
     }
   }
@@ -201,7 +204,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     event.preventDefault();
     const list = this.element.querySelector('.playlist-section-list');
     if (!list) {
-      ATLAS.log(2, 'No playlist section list found');
+      log(2, 'No playlist section list found');
       return;
     }
     const draggingItem = list.querySelector('.dragging');
@@ -243,7 +246,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         }, null)?.element || null
       );
     } catch (error) {
-      ATLAS.log(1, 'Error finding drag target:', error);
+      log(1, 'Error finding drag target:', error);
       return null;
     }
   }
@@ -257,17 +260,32 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     try {
       event.preventDefault();
       const dataString = event.dataTransfer.getData('text/plain');
-      if (!dataString) return false;
+      if (!dataString) {
+        log(2, 'Failed to reorder sections: empty drag data');
+        return false;
+      }
       const data = JSON.parse(dataString);
-      if (!data || data.type !== 'playlist-config-reorder') return false;
+      if (!data || data.type !== 'playlist-config-reorder') {
+        log(2, 'Failed to reorder sections: invalid drag data type');
+        return false;
+      }
       const sourceIndex = parseInt(data.index);
-      if (isNaN(sourceIndex)) return false;
+      if (isNaN(sourceIndex)) {
+        log(2, `Failed to reorder sections: invalid source index '${data.index}'`);
+        return false;
+      }
       const list = this.element.querySelector('.playlist-section-list');
       const items = Array.from(list.querySelectorAll('li:not(.dragging)'));
       const targetItem = this.getDragTarget(event, items);
-      if (!targetItem) return false;
+      if (!targetItem) {
+        log(2, 'Failed to reorder sections: no valid drag target found');
+        return false;
+      }
       const targetIndex = parseInt(targetItem.dataset.index);
-      if (isNaN(targetIndex)) return false;
+      if (isNaN(targetIndex)) {
+        log(2, `Failed to reorder sections: invalid target index '${targetItem.dataset.index}'`);
+        return false;
+      }
       const rect = targetItem.getBoundingClientRect();
       const dropAfter = event.clientY > rect.top + rect.height / 2;
       let newIndex = dropAfter ? targetIndex + 1 : targetIndex;
@@ -277,9 +295,10 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       this.updatePlaylistOrder();
       if (this._formState) for (const section of this.config) if (section.id in this._formState) section.enabled = this._formState[section.id];
       this.render(false);
+      log(3, `Successfully reordered sections: moved index ${sourceIndex} to index ${newIndex}`);
       return true;
     } catch (error) {
-      ATLAS.log(1, 'Error handling reorder drop:', error);
+      log(1, 'Error handling reorder drop:', error);
       return false;
     } finally {
       this.cleanupDragElements();
@@ -297,35 +316,56 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       event.preventDefault();
       event.currentTarget.classList.remove('drop-hover');
       const dataString = event.dataTransfer.getData('text/plain');
-      if (!dataString) return false;
+      if (!dataString) {
+        log(2, 'Failed to handle external drop: empty drag data');
+        return false;
+      }
       let data;
       try {
         data = JSON.parse(dataString);
       } catch (e) {
-        ATLAS.log(1, 'Failed to parse drag data:', e);
+        log(1, 'Failed to parse drag data:', e);
         return false;
       }
       if (data.type === 'playlist-config-reorder') return false;
-      if (!['Playlist', 'PlaylistSound'].includes(data.type) || !data.uuid) return false;
+      if (!['Playlist', 'PlaylistSound'].includes(data.type) || !data.uuid) {
+        log(2, `Failed to handle external drop: invalid document type '${data.type}'`);
+        return false;
+      }
       const section = event.currentTarget.dataset.section;
-      if (!section) return false;
+      if (!section) {
+        log(2, 'Failed to handle external drop: section data not found on drop target');
+        return false;
+      }
       const document = await fromUuid(data.uuid);
-      if (!document) return false;
+      if (!document) {
+        log(2, `Failed to handle external drop: document with UUID '${data.uuid}' not found`);
+        return false;
+      }
       let playlist, sound;
       if (document instanceof PlaylistSound) {
         playlist = document.parent;
         sound = document;
-      } else if (document instanceof Playlist) playlist = document;
-      else return false;
+      } else if (document instanceof Playlist) {
+        playlist = document;
+      } else {
+        log(2, `Failed to handle external drop: resolved document is not a Playlist or PlaylistSound`);
+        return false;
+      }
       const sectionConfig = CONST.playlistSections[this.documentTypeName][section];
-      if (!sectionConfig) return false;
+      if (!sectionConfig) {
+        log(2, `Failed to handle external drop: no section configuration found for '${section}'`);
+        return false;
+      }
       const updateData = { [`music.${section}.playlist`]: playlist.id, [`music.${section}.initialTrack`]: sound?.id || '' };
       const currentData = getProperty(this.document, this.updateDataPrefix) || {};
       const prevData = getProperty(currentData, `music.${section}`);
       if (!prevData?.priority) updateData[`music.${section}.priority`] = sectionConfig.priority;
       await this.updateObject(updateData);
+      log(3, `Successfully handled external drop: assigned playlist '${playlist.name}' and track '${sound?.name || 'Default'}' to section '${section}'`);
       return true;
-    } catch {
+    } catch (error) {
+      log(1, 'Error handling external drop:', error);
       return false;
     }
   }
@@ -452,7 +492,12 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static async deletePlaylist(_event, target) {
     const section = target.closest('.playlist-section').dataset.section;
-    await this.updateObject({ [`music.-=${section}`]: null });
+    try {
+      await this.updateObject({ [`music.-=${section}`]: null });
+      log(3, `Successfully deleted playlist configuration override for section '${section}'`);
+    } catch (error) {
+      log(1, `Failed to delete playlist configuration override for section '${section}':`, error);
+    }
   }
 
   /**
@@ -467,15 +512,18 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     const updateData = Object.fromEntries(Object.entries(formData.object).filter(([key]) => key.startsWith('music.')));
     if (Object.keys(updateData).length > 0) {
       try {
+        log(3, 'Saving VGMusic configuration updates:', updateData);
         await this.updateObject(updateData);
         game.vgmusic?.musicController?.playCurrentTrack();
+        log(3, 'Successfully saved VGMusic configuration updates.');
         this.close();
       } catch (error) {
-        ATLAS.log(1, 'Error updating data:', error);
+        log(1, 'Error updating data:', error);
         ui.notifications.error('Failed to save music configuration');
         return false;
       }
     } else {
+      log(3, 'Form submitted with no updates.');
       this.close();
     }
     return true;
@@ -515,7 +563,7 @@ export function getSceneControlButtons(controls) {
       };
     }
   } catch (error) {
-    ATLAS.log(1, 'Error adding scene control buttons:', error);
+    log(1, 'Error adding scene control buttons:', error);
   }
 }
 
@@ -553,7 +601,7 @@ export function handleSceneConfigRender(app, html) {
       new VGMusicConfig(app.document).render(true);
     });
   } catch (error) {
-    ATLAS.log(1, 'Error adding scene config button:', error);
+    log(1, 'Error adding scene config button:', error);
   }
 }
 
@@ -685,7 +733,7 @@ export function handleTokenConfigRender(app, html, _context, _options) {
       formGroup.insertAdjacentElement('afterend', checkboxGroup);
     }
   } catch (error) {
-    ATLAS.log(1, 'Error adding token config button:', error);
+    log(1, 'Error adding token config button:', error);
   }
 }
 
