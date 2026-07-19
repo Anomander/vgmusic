@@ -117,7 +117,9 @@ jobs:
 
       # Release to Foundry Package API
       - name: Release Foundry Package
-        if: ${{ secrets.FOUNDRY_API_TOKEN != '' }}
+        env:
+          FOUNDRY_API_TOKEN: ${{ secrets.FOUNDRY_API_TOKEN }}
+        if: env.FOUNDRY_API_TOKEN != ''
         run: |
           jq -n \
             --arg id "${{ env.MODULE_ID }}" \
