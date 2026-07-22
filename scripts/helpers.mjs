@@ -60,6 +60,7 @@ export class PlaylistContext {
     this.trackId = trackId;
     this.priority = priority;
     this.scopeEntity = scopeEntity;
+    this._resolvedTracks = null;
   }
 
   /**
@@ -67,6 +68,17 @@ export class PlaylistContext {
    * @returns {Array<object>} Array of tracks to play
    */
   get tracks() {
+    if (this._resolvedTracks !== null) return this._resolvedTracks;
+    this._resolvedTracks = this._resolveTracks();
+    return this._resolvedTracks;
+  }
+
+  /**
+   * Internal method to resolve tracks for this context
+   * @returns {Array<object>} Array of tracks to play
+   * @private
+   */
+  _resolveTracks() {
     if (!this.playlist) return [];
 
     if (this.trackId) {

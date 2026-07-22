@@ -175,6 +175,40 @@ export class MusicController {
   }
 
   /**
+   * Check if a playlist is configured or managed by VGMusic
+   * @param {object} playlist - Playlist document to check
+   * @returns {boolean} True if playlist is managed by VGMusic
+   */
+  isManagedPlaylist(playlist) {
+    if (!playlist) return false;
+
+    if (this.currentContext?.playlist?.id === playlist.id) return true;
+
+    for (const scene of game.scenes || []) {
+      const areaId = scene.getFlag(CONST.moduleId, 'music.area.playlist');
+      const combatId = scene.getFlag(CONST.moduleId, 'music.combat.playlist');
+      if (areaId === playlist.id || combatId === playlist.id) return true;
+    }
+
+    for (const actor of game.actors || []) {
+      const combatId = actor.getFlag(CONST.moduleId, 'music.combat.playlist');
+      if (combatId === playlist.id) return true;
+      const protoId = actor.prototypeToken?.flags?.[CONST.moduleId]?.music?.combat?.playlist;
+      if (protoId === playlist.id) return true;
+    }
+
+    try {
+      const defaultConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
+      const defaultCombatId = defaultConfig?.data?.vgmusic?.music?.combat?.playlist;
+      if (defaultCombatId === playlist.id) return true;
+    } catch (e) {
+      // setting not initialized
+    }
+
+    return false;
+  }
+
+  /**
    * Filter playlist contexts based on current state
    * @param {PlaylistContext} context - Context to filter
    * @returns {boolean} True if context should be included
@@ -301,7 +335,10 @@ export class MusicController {
       return;
     }
     for (const track of tracks) {
-      const flagData = { id: track.parent.id, trackId: track.id, start: (track.sound?.currentTime ?? 0) % (track.sound?.duration ?? 100) };
+      const currentTime = track.sound?.currentTime ?? 0;
+      const duration = track.sound?.duration ?? 100;
+      const start = duration > 0 ? currentTime % duration : 0;
+      const flagData = { id: track.parent.id, trackId: track.id, start: Number.isNaN(start) ? 0 : start };
       try {
         await entity.setFlag(CONST.moduleId, `playlist.${track.parent.id}.${track.id}`, flagData);
         log(3, `Successfully saved playlist position for track '${track.name}' on entity '${entity.name || entity.id}': start=${flagData.start}`);
@@ -317,11 +354,11 @@ export class MusicController {
    */
   async playMusic(context) {
     try {
-      const prevTracks = this.currentTracks;
+      const currentlyPlaying = game.playlists?.contents?.flatMap((p) => Array.from(p.sounds.values())).filter((s) => s.playing) || [];
       const newTracks = context?.tracks || [];
 
-      const tracksToStop = prevTracks.filter((pt) => !newTracks.some((nt) => nt.id === pt.id));
-      const tracksToPlay = newTracks.filter((nt) => !prevTracks.some((pt) => pt.id === nt.id && pt.sound?.playing));
+      const tracksToStop = currentlyPlaying.filter((pt) => this.isManagedPlaylist(pt.parent) && !newTracks.some((nt) => nt.id === pt.id));
+      const tracksToPlay = newTracks.filter((nt) => !currentlyPlaying.some((pt) => pt.id === nt.id && pt.sound?.playing));
 
       if (tracksToStop.length === 0 && tracksToPlay.length === 0 && newTracks.length > 0) {
         log(3, `All tracks for context '${context?.playlist?.name}' are already playing. Skipping playback change.`);
@@ -361,7 +398,7 @@ export class MusicController {
           for (const track of tracksToPlay) {
             const trackInfo = this.getTrackInfo(track);
             const startTime = trackInfo?.start ?? 0;
-            const shouldFadeIn = fadeMs > 0 && prevTracks.length > 0;
+            const shouldFadeIn = fadeMs > 0 && currentlyPlaying.length > 0;
             log(3, `Preparing to play track '${track.name}' from position ${startTime}s (fadeIn: ${shouldFadeIn})`);
             if (shouldFadeIn) {
               const targetVolume = track.volume;

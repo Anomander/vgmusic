@@ -359,10 +359,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       }
       const unsequencedMode = CONST.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
       if (playlist.mode === unsequencedMode && !sound) {
-        const msg = game.i18n?.format('VGMusic.ErrorSoundboardTrackRequired') || `For Soundboard playlists, selecting a specific track is mandatory.`;
-        ui.notifications.error(msg);
-        log(2, `Failed external drop: Soundboard playlist '${playlist.name}' requires a track selection.`);
-        return false;
+        sound = playlist.sounds.contents[0] || Array.from(playlist.sounds.values())[0] || null;
       }
       const updateData = { [`music.${section}.playlist`]: playlist.id, [`music.${section}.initialTrack`]: sound?.id || '' };
       const currentData = getProperty(this.document, this.updateDataPrefix) || {};
@@ -531,9 +528,8 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
           const playlist = game.playlists.get(playlistId);
           const unsequencedMode = CONST.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
           if (playlist && playlist.mode === unsequencedMode && !trackId) {
-            const msg = game.i18n?.format('VGMusic.ErrorSoundboardTrackRequired') || `For Soundboard playlists, selecting a specific track is mandatory.`;
-            ui.notifications.error(msg);
-            return false;
+            const firstTrack = playlist.sounds.contents[0] || Array.from(playlist.sounds.values())[0];
+            if (firstTrack) updateData[`music.${section}.initialTrack`] = firstTrack.id;
           }
         }
       }
@@ -676,7 +672,8 @@ export function handleCanvasReady() {
  * @param {object} updateData - The update data
  */
 export function handleUpdateScene(scene, updateData) {
-  if ('flags' in updateData && updateData.flags?.[CONST.moduleId]) game.vgmusic?.musicController?.playCurrentTrack();
+  const flags = updateData.flags?.[CONST.moduleId];
+  if (flags && ('music' in flags || 'useTokenMusic' in flags)) game.vgmusic?.musicController?.playCurrentTrack();
   if ('active' in updateData) {
     if (updateData.active !== true) scene.unsetFlag(CONST.moduleId, 'playlist').catch(() => {});
     game.vgmusic?.musicController?.playCurrentTrack();
@@ -689,7 +686,8 @@ export function handleUpdateScene(scene, updateData) {
  * @param {object} updateData - The update data
  */
 export function handleUpdateActor(_actor, updateData) {
-  if ('flags' in updateData && updateData.flags?.[CONST.moduleId]) game.vgmusic?.musicController?.playCurrentTrack();
+  const flags = updateData.flags?.[CONST.moduleId];
+  if (flags && ('music' in flags || 'useTokenMusic' in flags)) game.vgmusic?.musicController?.playCurrentTrack();
 }
 
 /**
@@ -698,7 +696,8 @@ export function handleUpdateActor(_actor, updateData) {
  * @param {object} updateData - The update data
  */
 export function handleUpdateToken(_token, updateData) {
-  if ('flags' in updateData && updateData.flags?.[CONST.moduleId]) game.vgmusic?.musicController?.playCurrentTrack();
+  const flags = updateData.flags?.[CONST.moduleId];
+  if (flags && ('music' in flags || 'useTokenMusic' in flags)) game.vgmusic?.musicController?.playCurrentTrack();
 }
 
 /**
