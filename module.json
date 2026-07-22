@@ -1,16 +1,12 @@
 {
   "authors": [
     {
-      "name": "Furyspark"
-    },
-    {
-      "discord": "Tyler",
-      "name": "Tyler",
-      "url": "https://github.com/Sayshal"
+      "name": "Anomander",
+      "url": "https://github.com/Anomander"
     }
   ],
-  "bugs": "https://github.com/Sayshal/vgmusic/issues",
-  "changelog": "https://github.com/Sayshal/vgmusic/releases",
+  "bugs": "https://github.com/Anomander/vgmusic/issues",
+  "changelog": "https://github.com/Anomander/vgmusic/releases",
   "compatibility": {
     "minimum": "14",
     "verified": "14.364"
@@ -34,10 +30,10 @@
       "path": "lang/pt-BR.json"
     }
   ],
-  "license": "https://github.com/Sayshal/vgmusic?tab=License-1-ov-file",
-  "manifest": "https://github.com/Sayshal/vgmusic/releases/latest/download/module.json",
-  "readme": "https://github.com/Sayshal/vgmusic?tab=readme-ov-file",
+  "license": "https://github.com/Anomander/vgmusic?tab=License-1-ov-file",
+  "manifest": "https://github.com/Anomander/vgmusic/releases/latest/download/module.json",
+  "readme": "https://github.com/Anomander/vgmusic?tab=readme-ov-file",
   "title": "Video Game Music",
-  "url": "https://github.com/Sayshal/vgmusic",
+  "url": "https://github.com/Anomander/vgmusic",
   "version": "1.0.1"
 }

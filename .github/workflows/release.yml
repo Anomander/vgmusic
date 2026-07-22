@@ -95,7 +95,7 @@ jobs:
           allowUpdates: true
           omitNameDuringUpdate: true
           draft: false
-          prerelease: true
+          prerelease: false
           omitDraftDuringUpdate: true
           omitPrereleaseDuringUpdate: true
           token: ${{ secrets.GITHUB_TOKEN }}
