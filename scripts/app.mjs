@@ -357,6 +357,13 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         log(2, `Failed to handle external drop: no section configuration found for '${section}'`);
         return false;
       }
+      const unsequencedMode = CONST.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
+      if (playlist.mode === unsequencedMode && !sound) {
+        const msg = game.i18n?.format('VGMusic.ErrorSoundboardTrackRequired') || `For Soundboard playlists, selecting a specific track is mandatory.`;
+        ui.notifications.error(msg);
+        log(2, `Failed external drop: Soundboard playlist '${playlist.name}' requires a track selection.`);
+        return false;
+      }
       const updateData = { [`music.${section}.playlist`]: playlist.id, [`music.${section}.initialTrack`]: sound?.id || '' };
       const currentData = getProperty(this.document, this.updateDataPrefix) || {};
       const prevData = getProperty(currentData, `music.${section}`);
@@ -511,6 +518,25 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   static async formHandler(_event, _form, formData) {
     const updateData = Object.fromEntries(Object.entries(formData.object).filter(([key]) => key.startsWith('music.')));
     if (Object.keys(updateData).length > 0) {
+      // Validate Soundboard playlists
+      const sections = new Set();
+      for (const key of Object.keys(updateData)) {
+        const parts = key.split('.');
+        if (parts[0] === 'music' && parts[1]) sections.add(parts[1]);
+      }
+      for (const section of sections) {
+        const playlistId = updateData[`music.${section}.playlist`];
+        const trackId = updateData[`music.${section}.initialTrack`];
+        if (playlistId) {
+          const playlist = game.playlists.get(playlistId);
+          const unsequencedMode = CONST.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
+          if (playlist && playlist.mode === unsequencedMode && !trackId) {
+            const msg = game.i18n?.format('VGMusic.ErrorSoundboardTrackRequired') || `For Soundboard playlists, selecting a specific track is mandatory.`;
+            ui.notifications.error(msg);
+            return false;
+          }
+        }
+      }
       try {
         log(3, 'Saving VGMusic configuration updates:', updateData);
         await this.updateObject(updateData);

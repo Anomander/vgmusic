@@ -63,13 +63,47 @@ export class PlaylistContext {
   }
 
   /**
-   * Get the track to play from this context
+   * Get all tracks to play from this context based on track override or playlist mode
+   * @returns {Array<object>} Array of tracks to play
+   */
+  get tracks() {
+    if (!this.playlist) return [];
+
+    if (this.trackId) {
+      const track = this.playlist.sounds.get(this.trackId);
+      return track ? [track] : [];
+    }
+
+    const mode = this.playlist.mode;
+    const modes = CONST.PLAYLIST_MODES || { UNSEQUENCED: -1, SEQUENTIAL: 0, SHUFFLE: 1, SIMULTANEOUS: 2 };
+
+    if (mode === modes.SIMULTANEOUS) {
+      return Array.from(this.playlist.sounds.values());
+    }
+
+    if (mode === modes.SHUFFLE) {
+      const order = this.playlist.playbackOrder || Array.from(this.playlist.sounds.keys());
+      if (order.length === 0) return [];
+      const randomIndex = Math.floor(Math.random() * order.length);
+      const track = this.playlist.sounds.get(order[randomIndex]);
+      return track ? [track] : [];
+    }
+
+    if (mode === modes.UNSEQUENCED) {
+      return [];
+    }
+
+    const firstTrackId = this.playlist.playbackOrder?.[0] || Array.from(this.playlist.sounds.keys())[0];
+    const track = firstTrackId ? this.playlist.sounds.get(firstTrackId) : null;
+    return track ? [track] : [];
+  }
+
+  /**
+   * Get the primary track to play from this context
    * @returns {object|null} The track or null
    */
   get track() {
-    if (this.trackId) return this.playlist?.sounds.get(this.trackId);
-    const firstTrackId = this.playlist?.playbackOrder?.[0];
-    return firstTrackId ? this.playlist.sounds.get(firstTrackId) : null;
+    return this.tracks[0] || null;
   }
 
   /**
@@ -86,15 +120,9 @@ export class PlaylistContext {
     }
     if (document instanceof foundry.abstract.Document) {
       const playlistId = document.getFlag(CONST.moduleId, `music.${type}.playlist`);
-      let playlist = playlistId ? game.playlists.get(playlistId) : null;
-      if (!playlist && document.documentName === 'Scene' && type === 'area') {
-        playlist = document.playlist || game.playlists.get(document.playlistId) || null;
-        if (playlist) {
-          log(3, `No VGM override found for scene area music. Falling back to Scene's native playlist: '${playlist.name}'`);
-        }
-      }
+      const playlist = playlistId ? game.playlists.get(playlistId) : null;
       if (!playlist) {
-        log(3, `PlaylistContext.fromDocument: No playlist override or fallback found on document '${document.name || document.id}' (type: '${type}')`);
+        log(3, `PlaylistContext.fromDocument: No playlist override found on document '${document.name || document.id}' (type: '${type}')`);
         return null;
       }
       const trackId = document.getFlag(CONST.moduleId, `music.${type}.initialTrack`) || null;

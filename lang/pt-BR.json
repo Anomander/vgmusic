@@ -29,5 +29,6 @@
   "VGMusic.UI.Reset": "Redefinir",
   "VGMusic.UI.Save": "Salvar",
   "VGMusic.UseTokenMusic.Hint": "Substitua a música de combate do ator com a configuração deste token.",
-  "VGMusic.UseTokenMusic.Label": "Usar Música do Token"
+  "VGMusic.UseTokenMusic.Label": "Usar Música do Token",
+  "VGMusic.ErrorSoundboardTrackRequired": "Para playlists do tipo Soundboard, a seleção de uma faixa específica é obrigatória."
 }

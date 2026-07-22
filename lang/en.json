@@ -31,5 +31,6 @@
   "VGMusic.UI.Reset": "Reset",
   "VGMusic.UI.Save": "Save",
   "VGMusic.UseTokenMusic.Hint": "Override actor combat music with this token's configuration",
-  "VGMusic.UseTokenMusic.Label": "Use Token Music"
+  "VGMusic.UseTokenMusic.Label": "Use Token Music",
+  "VGMusic.ErrorSoundboardTrackRequired": "For Soundboard playlists, selecting a specific track is mandatory."
 }
