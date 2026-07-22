@@ -43,6 +43,10 @@ export class MusicController {
    * Get the currently playing track
    * @returns {object|null} The current track or null
    */
+  get currentTrack() {
+    return this.currentContext?.track;
+  }
+
   /**
    * Get all currently playing tracks from the current context
    * @returns {Array<object>} Array of current tracks
@@ -52,7 +56,7 @@ export class MusicController {
   }
 
   /**
-   * Get stored info for the current primary track
+   * Get stored info for the current track
    * @returns {object} Track info or empty object
    */
   get currentTrackInfo() {
@@ -70,6 +74,212 @@ export class MusicController {
   getTrackInfo(track) {
     if (!track) return {};
     return this.currentContext?.scopeEntity?.getFlag(CONST.moduleId, `playlist.${track.parent.id}.${track.id}`) || {};
+  }
+
+  /**
+   * Check if game audio is ready for playback
+   * @returns {boolean} True if audio is unlocked
+   */
+  isAudioReady() {
+    return game.audio && !game.audio.locked;
+  }
+
+  /**
+   * Wait for audio to be ready or defer playback
+   * @param {Function} playCallback - Function to call when audio is ready
+   */
+  async waitForAudio(playCallback) {
+    if (this.isAudioReady()) {
+      await playCallback();
+    } else {
+      this.pendingPlayback = playCallback;
+      const onAudioUnlock = async () => {
+        if (this.pendingPlayback) {
+          await this.pendingPlayback();
+          this.pendingPlayback = null;
+        }
+        document.removeEventListener('click', onAudioUnlock);
+        document.removeEventListener('keydown', onAudioUnlock);
+      };
+      document.addEventListener('click', onAudioUnlock, { once: true });
+      document.addEventListener('keydown', onAudioUnlock, { once: true });
+    }
+  }
+
+  /**
+   * Determine which document to use for combatant music
+   * @param {object} token - The combatant's token
+   * @param {object} actor - The combatant's actor
+   * @returns {Document|object|null} The document to use for music lookup
+   */
+  _getCombatantMusicSource(token, actor) {
+    if (!token && !actor) {
+      log(3, '_getCombatantMusicSource: Both token and actor are missing.');
+      return null;
+    }
+    const tokenHasMusic = token?.getFlag(CONST.moduleId, 'music.combat.playlist');
+    const prototypeToken = actor?.prototypeToken;
+    const prototypeHasMusic = prototypeToken?.flags?.[CONST.moduleId]?.music?.combat?.playlist;
+    const actorHasMusic = actor?.getFlag(CONST.moduleId, 'music.combat.playlist');
+    if (token && !token.actorLink) {
+      if (tokenHasMusic) return token;
+      if (actorHasMusic) return actor;
+      log(3, `_getCombatantMusicSource: No combat music override found for unlinked token '${token.name}' or its actor.`);
+      return null;
+    }
+    if (token && token.actorLink) {
+      if (tokenHasMusic) {
+        const useTokenMusic = token.getFlag(CONST.moduleId, 'useTokenMusic');
+        if (useTokenMusic || (!prototypeHasMusic && !actorHasMusic)) return token;
+      }
+      if (prototypeHasMusic) return prototypeToken;
+    }
+    if (actorHasMusic) return actor;
+    log(3, `_getCombatantMusicSource: No combat music override found for linked token/actor '${actor?.name || token?.name}'`);
+    return null;
+  }
+
+  /**
+   * Get all current playlist contexts
+   * @returns {PlaylistContext[]} Array of playlist contexts
+   */
+  getAllCurrentPlaylists() {
+    const contexts = [];
+    const scene = this.currentScene;
+    const combat = this.currentCombat;
+    if (scene) {
+      const ctx = PlaylistContext.fromDocument(scene, 'area', scene);
+      if (ctx) contexts.push(ctx);
+    }
+    if (scene) {
+      const ctx = PlaylistContext.fromDocument(scene, 'combat', combat);
+      if (ctx) contexts.push(ctx);
+    }
+    if (combat?.combatant) {
+      for (const combatant of combat.combatants) {
+        const musicSource = this._getCombatantMusicSource(combatant.token, combatant.actor);
+        if (musicSource) {
+          const ctx = PlaylistContext.fromDocument(musicSource, 'combat', combat);
+          if (ctx) contexts.push(ctx);
+        }
+      }
+    }
+    if (combat) {
+      const defaultConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
+      if (defaultConfig) {
+        const ctx = PlaylistContext.fromDocument(defaultConfig, 'combat', combat);
+        if (ctx) contexts.push(ctx);
+      }
+    }
+    return contexts;
+  }
+
+  /**
+   * Filter playlist contexts based on current state
+   * @param {PlaylistContext} context - Context to filter
+   * @returns {boolean} True if context should be included
+   */
+  filterPlaylists(context) {
+    const combat = this.currentCombat;
+    if (context.context === 'combat' && !combat?.started) return false;
+    if (context.context === 'combat' && game.settings.get(CONST.moduleId, CONST.settings.suppressCombat)) return false;
+    if (context.context === 'area' && game.settings.get(CONST.moduleId, CONST.settings.suppressArea)) return false;
+    return true;
+  }
+
+  /**
+   * Sort playlist contexts by priority
+   * @param {PlaylistContext} a - First context
+   * @param {PlaylistContext} b - Second context
+   * @returns {number} Sort comparison result
+   */
+  sortPlaylists(a, b) {
+    const combat = this.currentCombat;
+    const currentCombatant = combat?.combatant;
+    const currentToken = currentCombatant?.token;
+    const currentActor = currentCombatant?.actor;
+    const currentPrototype = currentActor?.prototypeToken;
+    const isCurrentA = a.contextEntity === currentToken || a.contextEntity === currentActor || a.contextEntity === currentPrototype;
+    const isCurrentB = b.contextEntity === currentToken || b.contextEntity === currentActor || b.contextEntity === currentPrototype;
+    if (isCurrentA && !isCurrentB) return -1;
+    if (isCurrentB && !isCurrentA) return 1;
+    const silentMode = game.settings.get(CONST.moduleId, CONST.settings.silentCombatMusicMode);
+    if (silentMode === CONST.silentModes.lastActor) {
+      const combatants = combat?.turns || [];
+      const startIdx = combat?.current?.turn || 0;
+      if (startIdx >= 0 && combatants.length > 0) {
+        let i = startIdx;
+        do {
+          i = (i - 1 + combatants.length) % combatants.length;
+          const actor = combatants[i]?.actor;
+          const prototype = actor?.prototypeToken;
+          if (a.contextEntity === actor || a.contextEntity === prototype) return -1;
+          if (b.contextEntity === actor || b.contextEntity === prototype) return 1;
+        } while (i !== (startIdx + 1) % combatants.length);
+      }
+    } else if (silentMode === CONST.silentModes.area) {
+      if (getEntityTypeName(a.contextEntity) !== 'Actor' && a.context === 'area') return -1;
+      if (getEntityTypeName(b.contextEntity) !== 'Actor' && b.context === 'area') return 1;
+    } else if (silentMode === CONST.silentModes.generic) {
+      if (getEntityTypeName(a.contextEntity) !== 'Actor' && a.context === 'combat') return -1;
+      if (getEntityTypeName(b.contextEntity) !== 'Actor' && b.context === 'combat') return 1;
+    }
+    if (a.priority !== b.priority) return b.priority - a.priority;
+    const aTypeName = getEntityTypeName(a.contextEntity);
+    const bTypeName = getEntityTypeName(b.contextEntity);
+    if (aTypeName !== bTypeName) {
+      const priorities = CONST.documentSortPriority;
+      return priorities.indexOf(bTypeName) - priorities.indexOf(aTypeName);
+    }
+    return 0;
+  }
+
+  /**
+   * Get the current highest priority playlist context
+   * @returns {PlaylistContext|null} Current context or null
+   */
+  getCurrentPlaylist() {
+    const allContexts = this.getAllCurrentPlaylists();
+    const filteredContexts = allContexts.filter(this.filterPlaylists.bind(this));
+    const sortedContexts = filteredContexts.sort(this.sortPlaylists.bind(this));
+    if (sortedContexts.length > 0) {
+      return sortedContexts[0];
+    }
+    log(3, `getCurrentPlaylist: No active playlist contexts found after filtering (total contexts checked: ${allContexts.length}, after filter: ${filteredContexts.length})`);
+    return null;
+  }
+
+  /**
+   * Play the current track based on context
+   */
+  playCurrentTrack() {
+    if (!isHeadGM()) {
+      log(3, 'Skipping playCurrentTrack: not head GM');
+      return;
+    }
+    clearTimeout(this._playDebounce);
+    log(3, 'Debouncing track play calculation...');
+    this._playDebounce = setTimeout(async () => {
+      try {
+        const newContext = this.getCurrentPlaylist();
+        log(3, `Resolved current playlist context: ${newContext ? `${newContext.context} - '${newContext.playlist.name}' (track: '${newContext.track?.name || 'Default'}')` : 'None'}`);
+        await this.playMusic(newContext);
+      } catch (error) {
+        log(1, 'Error in debounced playCurrentTrack execution:', error);
+      }
+    }, 50);
+  }
+
+  /**
+   * Get playlist data for a track
+   * @param {Document} entity - Entity to get data from
+   * @param {string} playlistId - Playlist ID
+   * @param {string} trackId - Track ID
+   * @returns {object} Playlist data
+   */
+  getPlaylistData(entity, playlistId, trackId) {
+    const data = entity.getFlag(CONST.moduleId, `playlist.${playlistId}.${trackId}`);
+    return data || { id: playlistId, trackId, start: 0 };
   }
 
   /**
