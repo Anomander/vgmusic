@@ -68,6 +68,7 @@ jobs:
           zip -r ${{ env.ZIP_NAME }} \
             lang/ \
             scripts/ \
+            styles/ \
             templates/ \
             LICENSE \
             module.json \
