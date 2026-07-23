@@ -5,6 +5,7 @@ setupFoundryMocks();
 
 import { MoodConfigApp } from '../scripts/mood-config.mjs';
 import { MoodWidget } from '../scripts/mood-widget.mjs';
+import { registerSettings } from '../scripts/settings.mjs';
 import { CONST } from '../scripts/config.mjs';
 import { setMockSetting } from './mocks/foundry.mjs';
 
@@ -122,6 +123,34 @@ describe('MoodWidget', () => {
       await MoodWidget.handleSetMood(event, target);
 
       expect(game.settings.set).toHaveBeenCalledWith(CONST.moduleId, CONST.settings.activeMood, '');
+    });
+
+    it('refreshes open windows registered in ui.windows when activeMood setting changes', () => {
+      registerSettings();
+      const mockConfigApp = { constructor: { name: 'VGMusicConfig' }, rendered: true, selectedMood: '', render: vi.fn() };
+      const mockTreeApp = { constructor: { name: 'PlaylistTreeApp' }, rendered: true, render: vi.fn() };
+      globalThis.ui = { windows: { w1: mockConfigApp, w2: mockTreeApp } };
+
+      const settingObj = game.settings.register.mock.calls.find((call) => call[1] === CONST.settings.activeMood)?.[2];
+      expect(settingObj).toBeDefined();
+
+      settingObj.onChange('boss');
+
+      expect(mockConfigApp.selectedMood).toBe('boss');
+      expect(mockConfigApp.render).toHaveBeenCalledWith(false);
+      expect(mockTreeApp.render).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe('handleOpenPlaylistTree', () => {
+    it('calls PlaylistTreeApp.open to launch the hierarchy tree manager', () => {
+      const event = { preventDefault: vi.fn() };
+      game.vgmusic = { playlistTree: null };
+
+      MoodWidget.handleOpenPlaylistTree(event, null);
+
+      expect(event.preventDefault).toHaveBeenCalled();
+      expect(game.vgmusic.playlistTree).toBeDefined();
     });
   });
 });

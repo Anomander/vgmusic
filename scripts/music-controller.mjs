@@ -12,6 +12,8 @@ export class MusicController {
     this.isDebouncing = false;
     this._savedPlaylistPositions = new Map();
     this._audioUnlockRegistered = false;
+    this._transitionSequenceId = 0;
+    this._debounceTimer = null;
   }
 
   /**
@@ -47,10 +49,14 @@ export class MusicController {
   }
 
   /**
-   * Play current track according to highest priority playlist context
+   * Play current track according to highest priority playlist context.
+   * If called while debouncing, flags a pending play to ensure rapid mood changes resolve cleanly.
    */
   async playCurrentTrack() {
-    if (this.isDebouncing) return;
+    if (this.isDebouncing) {
+      this._pendingDebouncedPlay = true;
+      return;
+    }
     if (!isHeadGM()) return;
 
     if (this.isAudioLocked()) {
@@ -90,13 +96,21 @@ export class MusicController {
 
       log(3, `Resolved current playlist context: ${winnerContext?.context || 'none'} (moodOverride: ${winnerContext?.isMood ?? false}) - '${winnerContext?.playlist?.name || 'none'}' (${targetTracks.length} tracks, primary: '${primaryTrackName}')`);
 
-      if (
+      const contextUnchanged =
         this.currentContext?.playlist?.id === winnerContext?.playlist?.id &&
         this.currentTracks?.length === targetTracks.length &&
-        this.currentTracks.every((t, i) => t.id === targetTracks[i]?.id)
-      ) {
-        log(3, 'Current tracks already match resolved target context. No change.');
+        this.currentTracks.every((t, i) => t.id === targetTracks[i]?.id);
+
+      const audioActuallyPlaying = this.currentTracks?.length > 0 &&
+        this.currentTracks.some((t) => t.playing === true || t.sound?.playing === true);
+
+      if (contextUnchanged && audioActuallyPlaying) {
+        log(3, 'Current tracks already match resolved target context and audio is playing. No change.');
         return;
+      }
+
+      if (contextUnchanged && !audioActuallyPlaying && targetTracks.length > 0) {
+        log(3, 'Context unchanged but audio is not playing — restarting tracks.');
       }
 
       await this.transitionToContext(winnerContext);
@@ -105,7 +119,11 @@ export class MusicController {
     } finally {
       setTimeout(() => {
         this.isDebouncing = false;
-      }, 300);
+        if (this._pendingDebouncedPlay) {
+          this._pendingDebouncedPlay = false;
+          this.playCurrentTrack();
+        }
+      }, 150);
     }
   }
 
@@ -114,6 +132,7 @@ export class MusicController {
    * @param {PlaylistContext|null} targetContext Target context to play
    */
   async transitionToContext(targetContext) {
+    const transitionId = ++this._transitionSequenceId;
     const targetTracks = targetContext?.tracks || [];
     const targetTrackIds = new Set(targetTracks.map((t) => t.id));
     const fadeDurationSec = game.settings.get(CONST.moduleId, CONST.settings.fadeDuration) ?? 3;
@@ -152,20 +171,37 @@ export class MusicController {
 
     this.currentContext = targetContext;
     this.currentTracks = targetTracks;
+    this._refreshUI();
 
     for (const targetTrack of targetTracks) {
+      if (this._transitionSequenceId !== transitionId) return;
       const savedPosition = this.getPlaylistData(targetContext.scopeEntity, targetTrack);
       const originalVolume = targetTrack.volume ?? targetTrack.sound?.volume ?? 1.0;
       log(3, `Preparing to play track '${targetTrack.name}' from position ${savedPosition}s (targetVolume: ${originalVolume}, fadeIn: ${fadeDurationMs > 0})`);
 
       if (fadeDurationMs > 0) {
         await targetTrack.update({ offset: savedPosition });
+        if (this._transitionSequenceId !== transitionId) return;
         await this.playTrack(targetTrack);
         this._fadeInWhenReady(targetTrack, fadeDurationMs, originalVolume);
       } else {
         await targetTrack.update({ offset: savedPosition });
+        if (this._transitionSequenceId !== transitionId) return;
         await this.playTrack(targetTrack);
       }
+    }
+  }
+
+  /**
+   * Refresh rendered UI applications when music state or context changes
+   * @private
+   */
+  _refreshUI() {
+    if (game.vgmusic?.playlistTree?.rendered) {
+      game.vgmusic.playlistTree.render(false);
+    }
+    if (game.vgmusic?.moodWidget?.rendered) {
+      game.vgmusic.moodWidget.render(false);
     }
   }
 
@@ -318,9 +354,15 @@ export class MusicController {
     if (!sound) return;
     try {
       if (sound.parent?.playSound) {
-        await sound.parent.playSound(sound);
+        await sound.parent.playSound(sound).catch((error) => {
+          if (error?.name === 'AbortError' || error?.message?.includes('interrupted')) return;
+          throw error;
+        });
       } else if (typeof sound.play === 'function') {
-        await sound.play();
+        await sound.play().catch((error) => {
+          if (error?.name === 'AbortError' || error?.message?.includes('interrupted')) return;
+          throw error;
+        });
       }
     } catch (error) {
       if (error?.name === 'AbortError' || error?.message?.includes('interrupted')) {
@@ -338,7 +380,12 @@ export class MusicController {
     if (!sound) return;
     try {
       if (sound.parent?.stopSound) {
-        sound.parent.stopSound(sound)?.catch?.(() => {});
+        const res = sound.parent.stopSound(sound);
+        if (res && typeof res.catch === 'function') {
+          res.catch((error) => {
+            if (error?.name === 'AbortError' || error?.message?.includes('interrupted')) return;
+          });
+        }
       } else if (sound.sound?.stop) {
         sound.sound.stop();
       } else if (typeof sound.stop === 'function') {

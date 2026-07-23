@@ -24,6 +24,32 @@
   margin-bottom: 6px;
 }
 
+.mood-widget-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.widget-action-btn {
+  border: none;
+  background: transparent;
+  color: var(--color-text-subtle, #aaa);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+}
+
+.widget-action-btn:hover {
+  color: var(--color-text-light, #fff);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.widget-action-btn:active i {
+  transform: rotate(180deg);
+  transition: transform 0.2s ease;
+}
+
 .mood-active-badge {
   font-size: 0.85em;
   padding: 3px 10px;
@@ -206,4 +232,244 @@
   border-radius: 4px;
   cursor: pointer;
   background: transparent;
+}
+
+/* Playlist Hierarchy Tree Application */
+.vgmusic-playlist-tree-window {
+  min-width: 620px;
+}
+
+.vgmusic-playlist-tree {
+  gap: 10px;
+}
+
+.vgmusic-playlist-tree .tree-header-bar {
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.15));
+}
+
+.vgmusic-playlist-tree .active-resolution-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(46, 204, 113, 0.15);
+  border: 1px solid #2ecc71;
+  color: #2ecc71;
+  font-size: 0.85em;
+  font-weight: bold;
+}
+
+.vgmusic-playlist-tree .active-resolution-pill .active-dot {
+  animation: pulse-dot 1.5s infinite;
+}
+
+@keyframes pulse-dot {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+.vgmusic-playlist-tree .tree-nodes-container {
+  gap: 12px;
+}
+
+.vgmusic-playlist-tree .tree-node {
+  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.15));
+  border-radius: 6px;
+  background: var(--color-bg-option, rgba(15, 15, 25, 0.6));
+  padding: 10px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vgmusic-playlist-tree .tree-node.is-resolving {
+  border-color: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.3);
+}
+
+.vgmusic-playlist-tree .tree-node-header {
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: 4px;
+}
+
+.vgmusic-playlist-tree .tree-node-header.clickable {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15ease;
+}
+
+.vgmusic-playlist-tree .tree-node-header.clickable:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vgmusic-playlist-tree .section-chevron {
+  width: 14px;
+  text-align: center;
+  color: var(--color-text-subtle, #aaa);
+  transition: transform 0.15s ease;
+}
+
+.vgmusic-playlist-tree .node-title {
+  font-weight: bold;
+  font-size: 1.05em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vgmusic-playlist-tree .resolving-badge {
+  font-size: 0.8em;
+  color: #2ecc71;
+  font-weight: bold;
+}
+
+.vgmusic-playlist-tree .mood-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 10px;
+}
+
+.vgmusic-playlist-tree .mood-card {
+  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.15));
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.vgmusic-playlist-tree .mood-card.resolving-mood,
+.vgmusic-playlist-tree .mood-card.is-resolving {
+  border-color: #2ecc71 !important;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.4);
+}
+
+.vgmusic-playlist-tree .mood-card-header {
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: var(--mood-color, #3b82f6);
+}
+
+.vgmusic-playlist-tree .mood-card-header.clickable {
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+  padding: 2px 4px;
+  transition: background 0.15s ease;
+}
+
+.vgmusic-playlist-tree .mood-card-header.clickable:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.vgmusic-playlist-tree .context-boxes {
+  display: flex;
+  gap: 8px;
+}
+
+.vgmusic-playlist-tree .context-box {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.vgmusic-playlist-tree .context-box-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.vgmusic-playlist-tree .context-box-header .box-title {
+  font-size: 0.85em;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-light, #e0e0e0);
+}
+
+.vgmusic-playlist-tree .context-box-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vgmusic-playlist-tree .track-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vgmusic-playlist-tree select {
+  width: 100%;
+  height: 28px;
+  padding: 2px 4px;
+  font-size: 0.85em;
+  border-radius: 4px;
+}
+
+.vgmusic-playlist-tree .soundboard-required-badge {
+  color: #ef4444;
+  font-weight: bold;
+  font-size: 1.1em;
+  margin: 0 2px;
+  cursor: help;
+}
+
+.vgmusic-playlist-tree .clear-btn {
+  flex: 0 0 22px;
+  height: 22px;
+  width: 22px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  font-size: 0.75em;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.vgmusic-playlist-tree .clear-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.vgmusic-playlist-tree .tree-footer-bar {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.15));
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vgmusic-playlist-tree .mood-config-btn {
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  font-size: 0.9em;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+  cursor: pointer;
 }

@@ -47,7 +47,16 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
   constructor(object, options = {}) {
     super(options);
     this.document = object || game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
-    this.selectedMood = options.selectedMood || '';
+    this.selectedMood = options.selectedMood || game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
+    if (game.vgmusic) game.vgmusic.configApp = this;
+  }
+
+  /** @override */
+  _onClose(options) {
+    super._onClose(options);
+    if (game.vgmusic?.configApp === this) {
+      game.vgmusic.configApp = null;
+    }
   }
 
   /**
@@ -141,6 +150,7 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       { type: 'submit', icon: 'fas fa-save', label: 'VGMusic.UI.Save' },
       { type: 'button', action: 'reset', icon: 'fas fa-undo', label: 'VGMusic.UI.Reset' }
     ];
+    const activeWorldMood = game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
     const configuredMoods = game.settings.get(CONST.moduleId, CONST.settings.configuredMoods) || CONST.defaultMoods;
     const docData = getProperty(this.document, this.updateDataPrefix) || {};
     const availableMoods = configuredMoods.map((m) => {
@@ -156,10 +166,11 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       return {
         ...m,
         isActive: m.id === (this.selectedMood || ''),
+        isWorldActive: m.id === activeWorldMood,
         hasOverride
       };
     });
-    return { playlistConfig, buttons, documentType: this.documentTypeName, availableMoods, selectedMood: this.selectedMood || '' };
+    return { playlistConfig, buttons, documentType: this.documentTypeName, availableMoods, selectedMood: this.selectedMood || '', activeWorldMood };
   }
 
   /** @override */

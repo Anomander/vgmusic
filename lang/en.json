@@ -34,6 +34,7 @@
   "VGMusic.UseTokenMusic.Label": "Use Token Music",
   "VGMusic.ErrorSoundboardTrackRequired": "For Soundboard playlists, selecting a specific track is mandatory.",
   "VGMusic.MoodWidget.Title": "Mood Widget",
+  "VGMusic.MoodWidget.Refresh": "Re-trigger Current Mood & Music",
   "VGMusic.MoodWidget.Dock": "Dock Widget",
   "VGMusic.MoodWidget.Undock": "Undock Window",
   "VGMusic.Keybindings.ToggleMoodWidget": "Toggle Mood Widget",
@@ -50,5 +51,17 @@
   "VGMusic.Mood.Victory": "Victory",
   "VGMusic.MoodOverride": "Mood Override",
   "VGMusic.MoodHasOverride": "Has Mood Override",
-  "VGMusic.UI.Delete": "Delete"
+  "VGMusic.UI.Delete": "Delete",
+  "VGMusic.PlaylistTree.Title": "Playlist Hierarchy Tree",
+  "VGMusic.PlaylistTree.Label": "Open Playlist Tree",
+  "VGMusic.PlaylistTree.Hint": "Manage playlist hierarchy across scenes and world defaults",
+  "VGMusic.PlaylistTree.Scene": "Target Scene",
+  "VGMusic.PlaylistTree.GlobalOnly": "Global Defaults Only",
+  "VGMusic.PlaylistTree.Active": "Active",
+  "VGMusic.PlaylistTree.SceneMoods": "Scene Mood Overrides",
+  "VGMusic.PlaylistTree.SceneDefaults": "Scene Default Overrides",
+  "VGMusic.PlaylistTree.GlobalMoods": "Global Mood Overrides",
+  "VGMusic.PlaylistTree.GlobalDefaults": "Global World Defaults",
+  "VGMusic.PlaylistTree.ActivePlaying": "Currently Active Audio Source",
+  "VGMusic.Keybindings.TogglePlaylistTree": "Toggle Playlist Tree Window"
 }

@@ -1,6 +1,7 @@
 import { VGMusicConfig } from './app.mjs';
 import { MoodConfigApp } from './mood-config.mjs';
 import { MoodWidget } from './mood-widget.mjs';
+import { PlaylistTreeApp } from './playlist-tree.mjs';
 import { CONST } from './config.mjs';
 import { log } from './helpers.mjs';
 
@@ -8,6 +9,15 @@ import { log } from './helpers.mjs';
  * Register module settings and configuration menu
  */
 export function registerSettings() {
+  game.settings.registerMenu(CONST.moduleId, 'playlistTreeMenu', {
+    name: 'VGMusic.PlaylistTree.Name',
+    label: 'VGMusic.PlaylistTree.Label',
+    hint: 'VGMusic.PlaylistTree.Hint',
+    icon: 'fas fa-sitemap',
+    type: PlaylistTreeApp,
+    restricted: true
+  });
+
   game.settings.registerMenu(CONST.moduleId, 'defaultMusicMenu', {
     name: 'VGMusic.Settings.DefaultMusic.Name',
     label: 'VGMusic.Settings.DefaultMusic.Label',
@@ -40,10 +50,25 @@ export function registerSettings() {
     config: false,
     type: String,
     default: '',
-    onChange: () => {
+    onChange: (newMood) => {
       game.vgmusic?.musicController?.playCurrentTrack();
-      if (game.vgmusic?.moodWidget?.rendered) {
-        game.vgmusic.moodWidget.render(false);
+
+      const refreshApp = (app) => {
+        if (!app || !app.rendered) return;
+        const name = app.constructor?.name;
+        if (name === 'MoodWidget' || name === 'PlaylistTreeApp') {
+          app.render(false);
+        } else if (name === 'VGMusicConfig') {
+          app.selectedMood = newMood || '';
+          app.render(false);
+        }
+      };
+
+      if (typeof ui !== 'undefined' && ui.windows) {
+        for (const app of Object.values(ui.windows)) refreshApp(app);
+      }
+      if (foundry?.applications?.instances) {
+        for (const app of foundry.applications.instances.values()) refreshApp(app);
       }
     }
   });
@@ -55,8 +80,17 @@ export function registerSettings() {
     type: Array,
     default: CONST.defaultMoods,
     onChange: () => {
-      if (game.vgmusic?.moodWidget?.rendered) {
-        game.vgmusic.moodWidget.render(false);
+      const refreshApp = (app) => {
+        if (app && app.rendered && ['MoodWidget', 'PlaylistTreeApp', 'VGMusicConfig'].includes(app.constructor?.name)) {
+          app.render(false);
+        }
+      };
+
+      if (typeof ui !== 'undefined' && ui.windows) {
+        for (const app of Object.values(ui.windows)) refreshApp(app);
+      }
+      if (foundry?.applications?.instances) {
+        for (const app of foundry.applications.instances.values()) refreshApp(app);
       }
     }
   });
@@ -127,6 +161,11 @@ export function registerKeybindings() {
   game.keybindings.register(CONST.moduleId, 'toggleMoodWidget', {
     name: 'VGMusic.Keybindings.ToggleMoodWidget',
     onDown: () => MoodWidget.toggle()
+  });
+
+  game.keybindings.register(CONST.moduleId, 'togglePlaylistTree', {
+    name: 'VGMusic.Keybindings.TogglePlaylistTree',
+    onDown: () => PlaylistTreeApp.toggle()
   });
 }
 

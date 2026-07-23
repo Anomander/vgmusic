@@ -97,7 +97,9 @@ export function handleSceneConfigRender(app, html) {
  * @param {object} updateData - The update data
  */
 export function handleUpdateCombat(combat, updateData) {
-  if (combat.started && (updateData.turn != null || updateData.round != null)) game.vgmusic?.musicController?.playCurrentTrack();
+  if ('started' in updateData || (combat.started && (updateData.turn != null || updateData.round != null))) {
+    game.vgmusic?.musicController?.playCurrentTrack();
+  }
 }
 
 /**

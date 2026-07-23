@@ -8,6 +8,7 @@
     {{#each availableMoods}}
     <a class="item {{#if this.isActive}}active{{/if}}" data-action="selectMood" data-mood="{{this.id}}" style="padding: 4px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px; --mood-color: {{this.color}};">
       <i class="{{this.icon}}"></i> {{localize this.label}}
+      {{#if this.isWorldActive}}<span class="world-active-indicator" data-tooltip="{{localize 'VGMusic.PlaylistTree.ActivePlaying'}}" style="color: #2ecc71; font-weight: bold; margin-left: 2px;">★</span>{{/if}}
       {{#if this.hasOverride}}<span class="override-indicator" style="color: {{this.color}}; font-weight: bold; margin-left: 2px;">●</span>{{/if}}
     </a>
     {{/each}}

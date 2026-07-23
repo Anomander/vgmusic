@@ -287,8 +287,20 @@ describe('MusicController', () => {
       vi.useRealTimers();
     });
 
-    it('skips transition if current tracks already match resolved target context', async () => {
-      const sound1 = createMockSound('s1', 'Sound 1');
+    it('queues a pending debounced play when called while debouncing', async () => {
+      vi.useFakeTimers();
+      controller.isDebouncing = true;
+      const executeSpy = vi.spyOn(controller, 'getAllCurrentPlaylists').mockReturnValue([]);
+
+      await controller.playCurrentTrack();
+      expect(controller._pendingDebouncedPlay).toBe(true);
+      expect(executeSpy).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    it('skips transition if current tracks already match resolved target context and audio is playing', async () => {
+      const sound1 = createMockSound('s1', 'Sound 1', { playing: true });
       const playlist = createMockPlaylist('p1', 'Playlist 1', [sound1]);
       const targetCtx = { playlist, tracks: [sound1], context: 'area' };
 
@@ -301,6 +313,23 @@ describe('MusicController', () => {
 
       await controller.playCurrentTrack();
       expect(transitionSpy).not.toHaveBeenCalled();
+    });
+
+    it('restarts transition if context matches but audio is not actually playing (stuck-silent state)', async () => {
+      // sound1.playing = false simulates the stuck state after rapid transitions
+      const sound1 = createMockSound('s1', 'Sound 1', { playing: false });
+      const playlist = createMockPlaylist('p1', 'Playlist 1', [sound1]);
+      const targetCtx = { playlist, tracks: [sound1], context: 'area' };
+
+      controller.currentContext = { playlist };
+      controller.currentTracks = [sound1];
+
+      vi.spyOn(controller, 'getAllCurrentPlaylists').mockReturnValue([targetCtx]);
+      vi.spyOn(controller, 'filterPlaylists').mockReturnValue(true);
+      const transitionSpy = vi.spyOn(controller, 'transitionToContext').mockResolvedValue();
+
+      await controller.playCurrentTrack();
+      expect(transitionSpy).toHaveBeenCalledWith(targetCtx);
     });
   });
 
@@ -342,6 +371,20 @@ describe('MusicController', () => {
       await controller.transitionToContext(targetCtx);
 
       expect(stopTrackSpy).toHaveBeenCalledWith(playingSound);
+    });
+
+    it('triggers _refreshUI and re-renders open playlistTree and moodWidget applications', async () => {
+      const treeRender = vi.fn();
+      const widgetRender = vi.fn();
+      game.vgmusic = {
+        playlistTree: { rendered: true, render: treeRender },
+        moodWidget: { rendered: true, render: widgetRender }
+      };
+
+      await controller.transitionToContext(null);
+
+      expect(treeRender).toHaveBeenCalledWith(false);
+      expect(widgetRender).toHaveBeenCalledWith(false);
     });
   });
 

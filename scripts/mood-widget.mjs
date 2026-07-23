@@ -1,5 +1,6 @@
 import { CONST } from './config.mjs';
 import { log } from './helpers.mjs';
+import { PlaylistTreeApp } from './playlist-tree.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -22,8 +23,10 @@ export class MoodWidget extends HandlebarsApplicationMixin(ApplicationV2) {
     position: { width: 260, height: 'auto' },
     actions: {
       setMood: MoodWidget.handleSetMood,
+      refreshMood: MoodWidget.handleRefreshMood,
       toggleDock: MoodWidget.handleToggleDock,
-      toggleCompact: MoodWidget.handleToggleCompact
+      toggleCompact: MoodWidget.handleToggleCompact,
+      openPlaylistTree: MoodWidget.handleOpenPlaylistTree
     }
   };
 
@@ -41,6 +44,18 @@ export class MoodWidget extends HandlebarsApplicationMixin(ApplicationV2) {
 
     const closeBtn = frame.querySelector('.window-header [data-action="close"]');
     if (closeBtn) {
+      let treeBtn = frame.querySelector('[data-action="openPlaylistTree"]');
+      if (!treeBtn) {
+        const treeBtnHtml = `<button type="button" class="header-control fa-solid fa-sitemap icon" data-action="openPlaylistTree" data-tooltip="${game.i18n.localize('VGMusic.PlaylistTree.Title')}" aria-label="Open Playlist Tree"></button>`;
+        closeBtn.insertAdjacentHTML('beforebegin', treeBtnHtml);
+      }
+
+      let refreshBtn = frame.querySelector('[data-action="refreshMood"]');
+      if (!refreshBtn) {
+        const refreshBtnHtml = `<button type="button" class="header-control fa-solid fa-sync-alt icon" data-action="refreshMood" data-tooltip="${game.i18n.localize('VGMusic.MoodWidget.Refresh')}" aria-label="Refresh Mood"></button>`;
+        closeBtn.insertAdjacentHTML('beforebegin', refreshBtnHtml);
+      }
+
       let compactBtn = frame.querySelector('[data-action="toggleCompact"]');
       if (!compactBtn) {
         const compactBtnHtml = `<button type="button" class="header-control fa-solid fa-compress icon" data-action="toggleCompact" data-tooltip="Toggle Compact Mode" aria-label="Toggle Compact Mode"></button>`;
@@ -246,6 +261,24 @@ export class MoodWidget extends HandlebarsApplicationMixin(ApplicationV2) {
     } catch (error) {
       log(1, 'Error setting active mood:', error);
     }
+  }
+
+  /**
+   * Handle re-triggering the current mood selection
+   */
+  static async handleRefreshMood(event, target) {
+    event?.preventDefault?.();
+    if (game.vgmusic?.musicController) {
+      await game.vgmusic.musicController.playCurrentTrack();
+    }
+  }
+
+  /**
+   * Handle opening the playlist hierarchy tree manager window
+   */
+  static handleOpenPlaylistTree(event, target) {
+    event?.preventDefault?.();
+    PlaylistTreeApp.open();
   }
 
   /**
