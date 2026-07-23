@@ -51,6 +51,67 @@ export function getProperty(object, path) {
 }
 
 /**
+ * Safely fetch a playlist from game.playlists
+ * @param {string} playlistId - Playlist ID to look up
+ * @returns {object|null} Playlist document or null
+ */
+export function getPlaylistById(playlistId) {
+  if (!playlistId || !game.playlists) return null;
+  if (typeof game.playlists.get === 'function') return game.playlists.get(playlistId);
+  const list = game.playlists.contents || Array.from(game.playlists);
+  return list.find((p) => p.id === playlistId) || null;
+}
+
+/**
+ * Resolve the initial track to store alongside a playlist selection: keeps
+ * the existing track if one is set, otherwise auto-assigns the first track
+ * for Soundboard (UNSEQUENCED) playlists
+ * @param {string} playlistId - Selected playlist ID
+ * @param {string|null} existingTrackId - Previously configured track ID, if any
+ * @returns {string|null} Resolved initial track ID
+ */
+export function resolveInitialTrack(playlistId, existingTrackId) {
+  let initialTrackId = existingTrackId || null;
+  const playlist = getPlaylistById(playlistId);
+  const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
+  if (playlist?.mode === unsequencedMode && !initialTrackId) {
+    const firstTrack = (playlist.sounds?.contents || Array.from(playlist.sounds?.values() || []))[0];
+    if (firstTrack) initialTrackId = firstTrack.id;
+  }
+  return initialTrackId;
+}
+
+/**
+ * Build the list of available playlists with their tracks and soundboard flag,
+ * for populating playlist/track select dropdowns
+ * @returns {Array<{id: string, name: string, isSoundboard: boolean, tracks: Array<{id: string, name: string}>}>}
+ */
+export function getAvailablePlaylists() {
+  const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
+  return (game.playlists?.contents || Array.from(game.playlists || [])).map((p) => {
+    const tracks = (p.sounds?.contents || Array.from(p.sounds?.values() || [])).map((s) => ({ id: s.id, name: s.name }));
+    return { id: p.id, name: p.name, isSoundboard: p.mode === unsequencedMode, tracks };
+  });
+}
+
+/**
+ * Build a playlist/track entry for template display, resolving a Soundboard
+ * playlist's implicit first track when no explicit track is set
+ * @param {Array} availablePlaylists - Result of getAvailablePlaylists()
+ * @param {string|null} playlistId - Selected playlist ID
+ * @param {string|null} trackId - Selected track ID, if any
+ * @returns {{playlistId: string|null, initialTrackId: string|null, isSoundboard: boolean, tracks: Array}}
+ */
+export function buildPlaylistEntry(availablePlaylists, playlistId, trackId) {
+  const pl = playlistId ? availablePlaylists.find((p) => p.id === playlistId) : null;
+  const isSoundboard = pl?.isSoundboard ?? false;
+  const tracks = pl?.tracks || [];
+  let effectiveTrackId = trackId || null;
+  if (isSoundboard && !effectiveTrackId && tracks.length > 0) effectiveTrackId = tracks[0].id;
+  return { playlistId: playlistId || null, initialTrackId: effectiveTrackId, isSoundboard, tracks };
+}
+
+/**
  * Identify the VGMusic document category for a given entity
  * @param {Document|object} doc - The document to identify
  * @returns {'Document'|'PrototypeToken'|'DefaultMusic'|null}

@@ -1,8 +1,9 @@
 import { CONST } from './config.mjs';
-import { log } from './helpers.mjs';
+import { log, resolveInitialTrack, getAvailablePlaylists, buildPlaylistEntry } from './helpers.mjs';
 import { MoodConfigApp } from './mood-config.mjs';
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const { DragDrop } = foundry.applications.ux;
 
 /**
  * Playlist Hierarchy Tree Manager application
@@ -14,6 +15,7 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     window: { title: 'VGMusic.PlaylistTree.Title', icon: 'fas fa-sitemap', resizable: true, minimizable: true },
     classes: ['vgmusic-playlist-tree-window'],
     position: { width: 720, height: 'auto' },
+    dragDrop: [{ dragSelector: null, dropSelector: '.context-box[data-drop-scope]', permissions: { dragstart: false, drop: true }, callbacks: {} }],
     actions: {
       selectScene: PlaylistTreeApp.handleSelectScene,
       updateSceneMood: PlaylistTreeApp.handleUpdateSceneMood,
@@ -58,35 +60,8 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /** @override */
   _prepareContext(_options) {
-    const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
-    const playlistsMap = new Map();
-
-    const availablePlaylists = (game.playlists?.contents || Array.from(game.playlists || [])).map((p) => {
-      const tracks = (p.sounds?.contents || Array.from(p.sounds?.values() || [])).map((s) => ({
-        id: s.id,
-        name: s.name
-      }));
-      const isSoundboard = p.mode === unsequencedMode;
-      const item = { id: p.id, name: p.name, isSoundboard, tracks };
-      playlistsMap.set(p.id, item);
-      return item;
-    });
-
-    const buildEntry = (playlistId, trackId) => {
-      const pl = playlistId ? playlistsMap.get(playlistId) : null;
-      const isSoundboard = pl?.isSoundboard ?? false;
-      const tracks = pl?.tracks || [];
-      let effectiveTrackId = trackId || null;
-      if (isSoundboard && !effectiveTrackId && tracks.length > 0) {
-        effectiveTrackId = tracks[0].id;
-      }
-      return {
-        playlistId: playlistId || null,
-        initialTrackId: effectiveTrackId,
-        isSoundboard,
-        tracks
-      };
-    };
+    const availablePlaylists = getAvailablePlaylists();
+    const buildEntry = (playlistId, trackId) => buildPlaylistEntry(availablePlaylists, playlistId, trackId);
 
     const activeScene = game.scenes?.active || null;
 
@@ -243,6 +218,110 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.element.addEventListener('change', this._onChangeInputHandler);
       this._changeListenerBound = true;
     }
+    if (this.element && !this._dragLeaveListenerBound) {
+      this._onDragLeaveHandler = (event) => this._onDragLeaveExternal(event);
+      this.element.addEventListener('dragleave', this._onDragLeaveHandler);
+      this._dragLeaveListenerBound = true;
+    }
+    this._setupDragDrop();
+  }
+
+  /**
+   * Bind drop handling for Playlist/PlaylistSound documents dragged in from
+   * the sidebar Playlists directory onto an Area/Combat context box
+   * @private
+   */
+  _setupDragDrop() {
+    const dragDropConfigs = this.options.dragDrop || PlaylistTreeApp.DEFAULT_OPTIONS.dragDrop || [];
+    for (const dragDropOptions of dragDropConfigs) {
+      dragDropOptions.callbacks = {
+        dragover: this._onDragOverExternal.bind(this),
+        drop: this._onDropExternal.bind(this)
+      };
+      new DragDrop(dragDropOptions).bind(this.element);
+    }
+  }
+
+  /**
+   * Clear hover feedback once a drag genuinely leaves a context box (as opposed to
+   * moving between its child elements, which also fires dragleave on the box)
+   * @param {DragEvent} event
+   * @private
+   */
+  _onDragLeaveExternal(event) {
+    const box = event.target.closest?.('.context-box[data-drop-scope]');
+    if (!box) return;
+    if (event.relatedTarget && box.contains(event.relatedTarget)) return;
+    box.classList.remove('drop-hover');
+  }
+
+  /**
+   * Handle drag-over on a context box to show hover feedback for a valid external drag
+   * @param {DragEvent} event
+   * @private
+   */
+  _onDragOverExternal(event) {
+    event.preventDefault();
+    if (event.dataTransfer.types.includes('text/plain')) event.currentTarget.classList.add('drop-hover');
+  }
+
+  /**
+   * Handle dropping a Playlist or PlaylistSound from the sidebar onto an Area/Combat context box
+   * @param {DragEvent} event
+   * @private
+   */
+  async _onDropExternal(event) {
+    const target = event.currentTarget;
+    target.classList.remove('drop-hover');
+
+    try {
+      const dataString = event.dataTransfer.getData('text/plain');
+      if (!dataString) return false;
+      let data;
+      try {
+        data = JSON.parse(dataString);
+      } catch (e) {
+        log(1, 'Failed to parse drag data:', e);
+        return false;
+      }
+      if (!['Playlist', 'PlaylistSound'].includes(data.type) || !data.uuid) return false;
+
+      const document = await fromUuid(data.uuid);
+      if (!document) {
+        log(2, `Failed to handle playlist tree drop: document with UUID '${data.uuid}' not found`);
+        return false;
+      }
+
+      let playlist, sound;
+      if (document instanceof PlaylistSound) {
+        playlist = document.parent;
+        sound = document;
+      } else if (document instanceof Playlist) {
+        playlist = document;
+      } else {
+        log(2, `Failed to handle playlist tree drop: resolved document is not a Playlist or PlaylistSound`);
+        return false;
+      }
+
+      const { dropScope, contextType, moodId } = target.dataset;
+      const path = PlaylistTreeApp._buildPath(contextType, moodId || null);
+
+      if (dropScope === 'scene') {
+        const scene = game.scenes?.get(this.selectedSceneId);
+        if (!scene) return false;
+        await PlaylistTreeApp._applySceneEntry(scene, path, playlist.id, sound?.id);
+      } else {
+        await PlaylistTreeApp._applyGlobalEntry(path, playlist.id, sound?.id);
+      }
+
+      game.vgmusic?.musicController?.playCurrentTrack();
+      this.render(false);
+      log(3, `Successfully assigned playlist '${playlist.name}' via drop (scope: '${dropScope}', context: '${contextType}', mood: '${moodId || 'default'}')`);
+      return true;
+    } catch (error) {
+      log(1, 'Error handling playlist tree drop:', error);
+      return false;
+    }
   }
 
   /** @override */
@@ -252,6 +331,10 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       this.element.removeEventListener('change', this._onChangeInputHandler);
     }
     this._changeListenerBound = false;
+    if (this.element && this._onDragLeaveHandler) {
+      this.element.removeEventListener('dragleave', this._onDragLeaveHandler);
+    }
+    this._dragLeaveListenerBound = false;
   }
 
   /**
@@ -306,16 +389,6 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Helper to safely fetch a playlist from game.playlists
-   */
-  static _getPlaylist(playlistId) {
-    if (!playlistId || !game.playlists) return null;
-    if (typeof game.playlists.get === 'function') return game.playlists.get(playlistId);
-    const list = game.playlists.contents || Array.from(game.playlists);
-    return list.find((p) => p.id === playlistId) || null;
-  }
-
-  /**
    * Build the flag/setting path for a music section, optionally scoped to a mood
    * @private
    */
@@ -324,30 +397,15 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
-   * Resolve the initial track to store alongside a playlist selection: keeps
-   * the existing track if one is set, otherwise auto-assigns the first track
-   * for Soundboard (UNSEQUENCED) playlists
-   * @private
-   */
-  static _resolveInitialTrack(playlistId, existingTrackId) {
-    let initialTrackId = existingTrackId || null;
-    const playlist = PlaylistTreeApp._getPlaylist(playlistId);
-    const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
-    if (playlist?.mode === unsequencedMode && !initialTrackId) {
-      const firstTrack = (playlist.sounds?.contents || Array.from(playlist.sounds?.values() || []))[0];
-      if (firstTrack) initialTrackId = firstTrack.id;
-    }
-    return initialTrackId;
-  }
-
-  /**
    * Apply a playlist selection (or clear it, when playlistId is null) to a scene flag entry
+   * @param {string} [trackIdOverride] - When provided, used verbatim instead of resolving
+   *   from the existing/soundboard-default track (e.g. a specific track dragged onto the entry)
    * @private
    */
-  static async _applySceneEntry(scene, path, playlistId) {
+  static async _applySceneEntry(scene, path, playlistId, trackIdOverride = undefined) {
     if (playlistId) {
       const existingTrackId = scene.getFlag(CONST.moduleId, `${path}.initialTrack`) || null;
-      const initialTrackId = PlaylistTreeApp._resolveInitialTrack(playlistId, existingTrackId);
+      const initialTrackId = trackIdOverride !== undefined ? trackIdOverride : resolveInitialTrack(playlistId, existingTrackId);
       await scene.setFlag(CONST.moduleId, `${path}.playlist`, playlistId);
       if (initialTrackId) await scene.setFlag(CONST.moduleId, `${path}.initialTrack`, initialTrackId);
     } else {
@@ -367,15 +425,17 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Apply a playlist selection (or clear it, when playlistId is null) to the global defaultMusic setting
+   * @param {string} [trackIdOverride] - When provided, used verbatim instead of resolving
+   *   from the existing/soundboard-default track (e.g. a specific track dragged onto the entry)
    * @private
    */
-  static async _applyGlobalEntry(path, playlistId) {
+  static async _applyGlobalEntry(path, playlistId, trackIdOverride = undefined) {
     const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
     const updateData = foundry.utils.deepClone(prevConfig);
 
     if (playlistId) {
       const existingTrackId = foundry.utils.getProperty(updateData, `data.vgmusic.${path}.initialTrack`) || null;
-      const initialTrackId = PlaylistTreeApp._resolveInitialTrack(playlistId, existingTrackId);
+      const initialTrackId = trackIdOverride !== undefined ? trackIdOverride : resolveInitialTrack(playlistId, existingTrackId);
       foundry.utils.setProperty(updateData, `data.vgmusic.${path}.playlist`, playlistId);
       if (initialTrackId) foundry.utils.setProperty(updateData, `data.vgmusic.${path}.initialTrack`, initialTrackId);
     } else {

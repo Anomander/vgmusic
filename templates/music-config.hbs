@@ -1,6 +1,117 @@
 <div class="flexcol standard-form vgmusic-config">
   <input type="hidden" name="documentType" value="{{documentType}}">
 
+{{#if isTokenMoodGrid}}
+  <div class="vgmusic-mood-grid flexcol">
+    <div class="tree-node token-moods-node {{#if moodsResolving}}is-resolving{{/if}}">
+      <div class="tree-node-header flexrow clickable" data-action="toggleSection" data-section="tokenMoods" data-default-collapsed="{{collapsed.moods}}">
+        <div class="node-title">
+          <i class="fas {{#if collapsed.moods}}fa-chevron-right{{else}}fa-chevron-down{{/if}} section-chevron"></i>
+          <i class="fas fa-theater-masks"></i>
+          <span>{{localize "VGMusic.TokenConfig.MoodOverrides"}}</span>
+        </div>
+        {{#if moodsResolving}}
+        <span class="resolving-badge"><i class="fas fa-volume-up"></i> {{localize "VGMusic.PlaylistTree.Active"}}</span>
+        {{/if}}
+      </div>
+      {{#unless collapsed.moods}}
+      <div class="tree-node-body mood-grid">
+        {{#each moodCards}}
+        <div class="mood-card {{#if this.isActive}}active-mood{{/if}} {{#if this.isResolving}}resolving-mood{{/if}}" style="--mood-color: {{this.color}};">
+          <div class="mood-card-header clickable" data-action="toggleSection" data-section="{{this.cardKey}}" data-default-collapsed="{{this.isCardCollapsed}}">
+            <i class="fas {{#if this.isCardCollapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}} section-chevron"></i>
+            <i class="{{this.icon}}"></i>
+            <span class="mood-label">{{localize this.label}}</span>
+            {{#if this.hasOverride}}<span class="override-indicator" style="color: {{this.color}}; font-weight: bold; margin-left: auto;">●</span>{{/if}}
+          </div>
+          {{#unless this.isCardCollapsed}}
+          <div class="context-box playlist-section" data-section="combat" data-mood-id="{{this.moodId}}">
+            <div class="context-box-header flexrow">
+              <span class="box-title"><i class="fas fa-swords"></i> {{localize "VGMusic.PlaylistSection.Combat"}}</span>
+              {{#if combat.playlistId}}
+              <button type="button" class="clear-btn" data-action="clearMoodEntry" data-mood-id="{{this.moodId}}" data-tooltip="{{localize 'VGMusic.UI.Delete'}}">
+                <i class="fas fa-trash"></i>
+              </button>
+              {{/if}}
+            </div>
+            <div class="context-box-body flexcol">
+              <select class="playlist-select" data-change-action="updateMoodEntry" data-mood-id="{{this.moodId}}">
+                <option value="">-- {{localize "VGMusic.None"}} --</option>
+                {{#each ../availablePlaylists}}
+                <option value="{{this.id}}" {{#if (eq this.id ../combat.playlistId)}}selected{{/if}}>{{this.name}}{{#if this.isSoundboard}} (Soundboard){{/if}}</option>
+                {{/each}}
+              </select>
+              {{#if combat.playlistId}}
+              <div class="track-row flexrow">
+                {{#if combat.isSoundboard}}
+                <span class="soundboard-required-badge" data-tooltip="{{localize 'VGMusic.ErrorSoundboardTrackRequired'}}">*</span>
+                {{/if}}
+                <select class="track-select" data-change-action="updateMoodTrack" data-mood-id="{{this.moodId}}">
+                  {{#unless combat.isSoundboard}}<option value="">-- {{localize "VGMusic.InitialTrack"}} --</option>{{/unless}}
+                  {{#each combat.tracks}}
+                  <option value="{{this.id}}" {{#if (eq this.id ../combat.initialTrackId)}}selected{{/if}}>{{this.name}}</option>
+                  {{/each}}
+                </select>
+              </div>
+              {{/if}}
+            </div>
+          </div>
+          {{/unless}}
+        </div>
+        {{/each}}
+      </div>
+      {{/unless}}
+    </div>
+
+    <div class="tree-node token-default-node {{#if defaultResolving}}is-resolving{{/if}}">
+      <div class="tree-node-header flexrow clickable" data-action="toggleSection" data-section="tokenDefault" data-default-collapsed="{{collapsed.default}}">
+        <div class="node-title">
+          <i class="fas {{#if collapsed.default}}fa-chevron-right{{else}}fa-chevron-down{{/if}} section-chevron"></i>
+          <i class="fas fa-image"></i>
+          <span>{{localize "VGMusic.TokenConfig.DefaultCombat"}}</span>
+        </div>
+        {{#if defaultResolving}}
+        <span class="resolving-badge"><i class="fas fa-volume-up"></i> {{localize "VGMusic.PlaylistTree.Active"}}</span>
+        {{/if}}
+      </div>
+      {{#unless collapsed.default}}
+      <div class="tree-node-body default-fields">
+        <div class="context-box playlist-section" data-section="combat" data-mood-id="">
+          <div class="context-box-header flexrow">
+            <span class="box-title"><i class="fas fa-swords"></i> {{localize "VGMusic.PlaylistSection.Combat"}}</span>
+            {{#if defaultEntry.combat.playlistId}}
+            <button type="button" class="clear-btn" data-action="clearDefaultEntry" data-tooltip="{{localize 'VGMusic.UI.Delete'}}">
+              <i class="fas fa-trash"></i>
+            </button>
+            {{/if}}
+          </div>
+          <div class="context-box-body flexcol">
+            <select class="playlist-select" data-change-action="updateDefaultEntry">
+              <option value="">-- {{localize "VGMusic.None"}} --</option>
+              {{#each availablePlaylists}}
+              <option value="{{this.id}}" {{#if (eq this.id ../defaultEntry.combat.playlistId)}}selected{{/if}}>{{this.name}}{{#if this.isSoundboard}} (Soundboard){{/if}}</option>
+              {{/each}}
+            </select>
+            {{#if defaultEntry.combat.playlistId}}
+            <div class="track-row flexrow">
+              {{#if defaultEntry.combat.isSoundboard}}
+              <span class="soundboard-required-badge" data-tooltip="{{localize 'VGMusic.ErrorSoundboardTrackRequired'}}">*</span>
+              {{/if}}
+              <select class="track-select" data-change-action="updateDefaultTrack">
+                {{#unless defaultEntry.combat.isSoundboard}}<option value="">-- {{localize "VGMusic.InitialTrack"}} --</option>{{/unless}}
+                {{#each defaultEntry.combat.tracks}}
+                <option value="{{this.id}}" {{#if (eq this.id ../defaultEntry.combat.initialTrackId)}}selected{{/if}}>{{this.name}}</option>
+                {{/each}}
+              </select>
+            </div>
+            {{/if}}
+          </div>
+        </div>
+      </div>
+      {{/unless}}
+    </div>
+  </div>
+{{else}}
   <nav class="sheet-tabs tabs mood-tabs" style="margin-bottom: 10px; display: flex; gap: 4px; border-bottom: 1px solid var(--color-border-subtle, #7a7971); padding-bottom: 4px; flex-wrap: wrap;">
     <a class="item {{#unless selectedMood}}active{{/unless}}" data-action="selectMood" data-mood="" style="padding: 4px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
       <i class="fas fa-music"></i> {{localize "VGMusic.Default"}}
@@ -81,4 +192,5 @@
       </button>
     {{/each}}
   </footer>
+{{/if}}
 </div>

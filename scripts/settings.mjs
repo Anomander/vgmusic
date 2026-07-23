@@ -1,4 +1,3 @@
-import { VGMusicConfig } from './app.mjs';
 import { MoodConfigApp } from './mood-config.mjs';
 import { MoodWidget } from './mood-widget.mjs';
 import { PlaylistTreeApp } from './playlist-tree.mjs';
@@ -18,15 +17,6 @@ export function registerSettings() {
     restricted: true
   });
 
-  game.settings.registerMenu(CONST.moduleId, 'defaultMusicMenu', {
-    name: 'VGMusic.Settings.DefaultMusic.Name',
-    label: 'VGMusic.Settings.DefaultMusic.Label',
-    hint: 'VGMusic.Settings.DefaultMusic.Hint',
-    icon: 'fas fa-music',
-    type: VGMusicConfig,
-    restricted: true
-  });
-
   game.settings.registerMenu(CONST.moduleId, 'moodConfigMenu', {
     name: 'VGMusic.Settings.MoodConfig.Name',
     label: 'VGMusic.Settings.MoodConfig.Label',
@@ -37,7 +27,6 @@ export function registerSettings() {
   });
 
   game.settings.register(CONST.moduleId, CONST.settings.defaultMusic, {
-    name: 'VGMusic.Settings.DefaultMusic.Name',
     scope: 'world',
     config: false,
     type: Object,

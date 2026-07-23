@@ -20,12 +20,7 @@ export const CONST = {
     { id: 'victory', label: 'VGMusic.Mood.Victory', icon: 'fas fa-trophy', color: '#ffeb3b' }
   ],
   playlistSections: {
-    DefaultMusic: {
-      area: { label: 'VGMusic.PlaylistSection.Area', priority: -40 },
-      combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -35 }
-    },
     Scene: { area: { label: 'VGMusic.PlaylistSection.Area', priority: -20 }, combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -15 } },
-    Actor: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: 0 } },
     Token: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: 20 } }
   }
 };

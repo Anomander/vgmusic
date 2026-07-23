@@ -1,5 +1,5 @@
 import { CONST } from './config.mjs';
-import { getDocumentCategory, getProperty, log } from './helpers.mjs';
+import { getDocumentCategory, getProperty, log, getAvailablePlaylists, buildPlaylistEntry, resolveInitialTrack } from './helpers.mjs';
 
 const _loc = (key) => game.i18n.localize(key);
 
@@ -26,7 +26,10 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       reset: VGMusicConfig.handleReset,
       openPlaylist: VGMusicConfig.openPlaylist,
       deletePlaylist: VGMusicConfig.deletePlaylist,
-      selectMood: VGMusicConfig.selectMood
+      selectMood: VGMusicConfig.selectMood,
+      clearMoodEntry: VGMusicConfig.handleClearMoodEntry,
+      clearDefaultEntry: VGMusicConfig.handleClearDefaultEntry,
+      toggleSection: VGMusicConfig.handleToggleSection
     },
     dragDrop: [
       { dragSelector: '.playlist-section-item[data-reorderable="true"]', dropSelector: '.playlist-section-list', permissions: { dragstart: true, drop: true }, callbacks: {} },
@@ -41,13 +44,15 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
 
   /**
    * Create a new configuration instance
-   * @param {object} object The document object to configure
+   * @param {Scene|TokenDocument|PrototypeToken} object The Scene or Token/PrototypeToken document to configure
    * @param {object} [options] Additional application options
    */
   constructor(object, options = {}) {
     super(options);
-    this.document = object || game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
+    this.document = object;
     this.selectedMood = options.selectedMood || game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
+    this.expandedSections = new Set(options.expandedSections || []);
+    this.collapsedSections = new Set(options.collapsedSections || []);
     if (game.vgmusic) game.vgmusic.configApp = this;
   }
 
@@ -57,6 +62,14 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     if (game.vgmusic?.configApp === this) {
       game.vgmusic.configApp = null;
     }
+    if (this.element && this._onChangeInputHandler) {
+      this.element.removeEventListener('change', this._onChangeInputHandler);
+    }
+    this._changeListenerBound = false;
+    if (this.element && this._onDragLeaveHandler) {
+      this.element.removeEventListener('dragleave', this._onDragLeaveHandler);
+    }
+    this._dragLeaveListenerBound = false;
   }
 
   /**
@@ -66,6 +79,166 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     event.preventDefault();
     this.selectedMood = target.dataset.mood || '';
     this.render(false);
+  }
+
+  /**
+   * Maps `data-change-action` values to their handler method name. Looked up
+   * dynamically on the class (rather than captured by reference) so that
+   * spying/mocking a handler is honored by dispatch.
+   */
+  static _CHANGE_ACTIONS = {
+    updateMoodEntry: 'handleUpdateMoodEntry',
+    updateMoodTrack: 'handleUpdateMoodTrack',
+    updateDefaultEntry: 'handleUpdateDefaultEntry',
+    updateDefaultTrack: 'handleUpdateDefaultTrack'
+  };
+
+  /**
+   * Internal delegated change event listener for the mood-grid select inputs
+   * @param {Event} event - The change event
+   * @private
+   */
+  _onChangeInput(event) {
+    const target = event.target;
+    if (!target || target.tagName !== 'SELECT' || !target.dataset.changeAction) return;
+    const methodName = VGMusicConfig._CHANGE_ACTIONS[target.dataset.changeAction];
+    const handler = methodName && VGMusicConfig[methodName];
+    if (typeof handler === 'function') handler.call(this, event, target);
+  }
+
+  /**
+   * Apply a playlist selection to a mood-grid entry, auto-resolving the initial
+   * track for Soundboard playlists or carrying over an existing track selection
+   * @param {string} path - Relative path under music., e.g. 'music.combat' or 'music.combat.moods.boss'
+   * @param {string} playlistId - Selected playlist ID
+   * @private
+   */
+  async _applyMoodGridEntry(path, playlistId) {
+    const docData = getProperty(this.document, this.updateDataPrefix) || {};
+    const existingTrackId = getProperty(docData, `${path}.initialTrack`) || null;
+    const initialTrackId = resolveInitialTrack(playlistId, existingTrackId);
+    const data = { [`${path}.playlist`]: playlistId };
+    if (initialTrackId) data[`${path}.initialTrack`] = initialTrackId;
+    await this.updateObject(data);
+  }
+
+  /**
+   * Handle updating a mood-scoped combat playlist entry (token mood-grid layout)
+   */
+  static async handleUpdateMoodEntry(event, target) {
+    const select = target.closest('select') || target;
+    const moodId = select.dataset.moodId;
+    const playlistId = select.value || null;
+    try {
+      if (playlistId) await this._applyMoodGridEntry(`music.combat.moods.${moodId}`, playlistId);
+      else await this.updateObject({ [`music.combat.moods.-=${moodId}`]: null });
+      game.vgmusic?.musicController?.playCurrentTrack();
+    } catch (error) {
+      log(1, 'Failed to update token mood override:', error);
+    }
+  }
+
+  /**
+   * Handle updating a mood-scoped combat track entry
+   */
+  static async handleUpdateMoodTrack(event, target) {
+    const select = target.closest('select') || target;
+    const moodId = select.dataset.moodId;
+    const trackId = select.value || null;
+    const path = `music.combat.moods.${moodId}`;
+    try {
+      if (trackId) await this.updateObject({ [`${path}.initialTrack`]: trackId });
+      else await this.updateObject({ [`${path}.-=initialTrack`]: null });
+      game.vgmusic?.musicController?.playCurrentTrack();
+    } catch (error) {
+      log(1, 'Failed to update token mood track:', error);
+    }
+  }
+
+  /**
+   * Handle clearing a mood-scoped combat override
+   */
+  static async handleClearMoodEntry(event, target) {
+    event.preventDefault();
+    const btn = target.closest('[data-mood-id]') || target;
+    const moodId = btn.dataset.moodId;
+    try {
+      await this.updateObject({ [`music.combat.moods.-=${moodId}`]: null });
+      game.vgmusic?.musicController?.playCurrentTrack();
+    } catch (error) {
+      log(1, 'Failed to clear token mood override:', error);
+    }
+  }
+
+  /**
+   * Handle updating the default (non-mood) combat playlist entry
+   */
+  static async handleUpdateDefaultEntry(event, target) {
+    const select = target.closest('select') || target;
+    const playlistId = select.value || null;
+    try {
+      if (playlistId) await this._applyMoodGridEntry('music.combat', playlistId);
+      else await this.updateObject({ 'music.combat.-=playlist': null, 'music.combat.-=initialTrack': null, 'music.combat.-=priority': null });
+      game.vgmusic?.musicController?.playCurrentTrack();
+    } catch (error) {
+      log(1, 'Failed to update token default override:', error);
+    }
+  }
+
+  /**
+   * Handle updating the default (non-mood) combat track entry
+   */
+  static async handleUpdateDefaultTrack(event, target) {
+    const select = target.closest('select') || target;
+    const trackId = select.value || null;
+    try {
+      if (trackId) await this.updateObject({ 'music.combat.initialTrack': trackId });
+      else await this.updateObject({ 'music.combat.-=initialTrack': null });
+      game.vgmusic?.musicController?.playCurrentTrack();
+    } catch (error) {
+      log(1, 'Failed to update token default track:', error);
+    }
+  }
+
+  /**
+   * Handle clearing the default (non-mood) combat override
+   */
+  static async handleClearDefaultEntry(event, target) {
+    event.preventDefault();
+    try {
+      await this.updateObject({ 'music.combat.-=playlist': null, 'music.combat.-=initialTrack': null, 'music.combat.-=priority': null });
+      game.vgmusic?.musicController?.playCurrentTrack();
+    } catch (error) {
+      log(1, 'Failed to clear token default override:', error);
+    }
+  }
+
+  /**
+   * Handle toggling mood-grid section/card collapse state
+   */
+  static handleToggleSection(event, target) {
+    event?.preventDefault?.();
+    const element = target.closest('[data-section]') || target;
+    const sectionKey = element?.dataset?.section;
+    if (!sectionKey) return;
+    const instance = this instanceof VGMusicConfig ? this : game.vgmusic?.configApp;
+    if (!instance) return;
+
+    const defaultCollapsed = element.dataset.defaultCollapsed === 'true';
+    const currentlyCollapsed = instance.expandedSections.has(sectionKey)
+      ? false
+      : instance.collapsedSections.has(sectionKey)
+        ? true
+        : defaultCollapsed;
+
+    if (currentlyCollapsed) {
+      instance.collapsedSections.delete(sectionKey);
+      instance.expandedSections.add(sectionKey);
+    } else {
+      instance.expandedSections.delete(sectionKey);
+      instance.collapsedSections.add(sectionKey);
+    }
+    instance.render(false);
   }
 
   /**
@@ -96,6 +269,27 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     if (getDocumentCategory(this.document) === 'PrototypeToken') return 'Token';
     log(2, `VGMusicConfig.documentTypeName: Unknown document class name: ${this.document?.constructor?.name}`);
     return undefined;
+  }
+
+  /**
+   * Whether this document type uses the mood-card-grid layout (all moods shown
+   * as simultaneous cards, matching PlaylistTreeApp) instead of the tabbed form
+   * @returns {boolean}
+   */
+  get isTokenMoodGrid() {
+    return this.documentTypeName === 'Token';
+  }
+
+  /**
+   * Helper to evaluate if a section or card is collapsed
+   * @param {string} key - Section or card identifier key
+   * @param {boolean} hasOverride - Whether the item has active overrides configured
+   * @returns {boolean} True if collapsed
+   */
+  isSectionCollapsed(key, hasOverride) {
+    if (this.expandedSections.has(key)) return false;
+    if (this.collapsedSections.has(key)) return true;
+    return !hasOverride;
   }
 
   /**
@@ -170,7 +364,73 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         hasOverride
       };
     });
-    return { playlistConfig, buttons, documentType: this.documentTypeName, availableMoods, selectedMood: this.selectedMood || '', activeWorldMood };
+    const context = {
+      playlistConfig,
+      buttons,
+      documentType: this.documentTypeName,
+      availableMoods,
+      selectedMood: this.selectedMood || '',
+      activeWorldMood,
+      isTokenMoodGrid: this.isTokenMoodGrid
+    };
+    if (this.isTokenMoodGrid) Object.assign(context, this._prepareMoodGridContext(docData, configuredMoods, activeWorldMood));
+    return context;
+  }
+
+  /**
+   * Build mood-card-grid context data for Token/PrototypeToken documents,
+   * mirroring PlaylistTreeApp's scene mood-grid + scene-defaults structure
+   * (Token only has a Combat section, so each card holds a single context box)
+   * @param {object} docData - This document's vgmusic flags/data namespace
+   * @param {Array} configuredMoods - World-configured moods
+   * @param {string} activeWorldMood - Currently active world mood ID
+   * @returns {object} Context fragment: availablePlaylists, moodCards, defaultEntry, moodsResolving, defaultResolving, collapsed
+   * @private
+   */
+  _prepareMoodGridContext(docData, configuredMoods, activeWorldMood) {
+    const availablePlaylists = getAvailablePlaylists();
+    const combatSection = docData.music?.combat || {};
+
+    const currentControllerContext = game.vgmusic?.musicController?.currentContext || null;
+    const winningEntity = currentControllerContext?.contextEntity;
+    const winningIsMood = currentControllerContext?.isMood ?? false;
+
+    const moodCards = configuredMoods.map((m) => {
+      const playlistId = combatSection.moods?.[m.id]?.playlist || null;
+      const trackId = combatSection.moods?.[m.id]?.initialTrack || null;
+      const hasOverride = !!playlistId;
+      const isResolving = winningEntity === this.document && winningIsMood && activeWorldMood === m.id;
+      const cardKey = `tokenMood:${m.id}`;
+      const isCardCollapsed = this.isSectionCollapsed(cardKey, hasOverride);
+
+      return {
+        moodId: m.id,
+        label: m.label,
+        icon: m.icon,
+        color: m.color,
+        combat: buildPlaylistEntry(availablePlaylists, playlistId, trackId),
+        isActive: activeWorldMood === m.id,
+        isResolving,
+        hasOverride,
+        isCardCollapsed,
+        cardKey
+      };
+    });
+
+    const defaultEntry = { combat: buildPlaylistEntry(availablePlaylists, combatSection.playlist || null, combatSection.initialTrack || null) };
+
+    const moodsResolving = winningEntity === this.document && winningIsMood;
+    const defaultResolving = winningEntity === this.document && !winningIsMood;
+
+    const hasMoodsOverride = moodCards.some((m) => m.hasOverride);
+    const hasDefaultOverride = !!defaultEntry.combat.playlistId;
+
+    const collapsed = {
+      moods: this.isSectionCollapsed('tokenMoods', hasMoodsOverride),
+      default: this.isSectionCollapsed('tokenDefault', hasDefaultOverride)
+    };
+
+    return { availablePlaylists, moodCards, defaultEntry, moodsResolving, defaultResolving, collapsed };
   }
 
   /** @override */
@@ -178,13 +438,24 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     super._onRender(context, options);
     this.setDraggableAttributes();
     this.setupDragDrop();
+    if (this.element && !this._changeListenerBound) {
+      this._onChangeInputHandler = (event) => this._onChangeInput(event);
+      this.element.addEventListener('change', this._onChangeInputHandler);
+      this._changeListenerBound = true;
+    }
+    if (this.element && !this._dragLeaveListenerBound) {
+      this._onDragLeaveHandler = (event) => this._onDragLeaveExternal(event);
+      this.element.addEventListener('dragleave', this._onDragLeaveHandler);
+      this._dragLeaveListenerBound = true;
+    }
   }
 
   /**
    * Set up drag and drop handlers for both reordering and external drops
    */
   setupDragDrop() {
-    this.options.dragDrop.forEach((dragDropOptions, index) => {
+    const dragDropConfigs = this.options.dragDrop || VGMusicConfig.DEFAULT_OPTIONS.dragDrop || [];
+    dragDropConfigs.forEach((dragDropOptions, index) => {
       if (index === 0) {
         dragDropOptions.callbacks = {
           dragstart: this.onDragStart.bind(this),
@@ -270,6 +541,19 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
     event.preventDefault();
     const hasExternalData = event.dataTransfer.types.includes('text/plain');
     if (hasExternalData) event.currentTarget.classList.add('drop-hover');
+  }
+
+  /**
+   * Clear hover feedback once a drag genuinely leaves a drop target (as opposed
+   * to moving between its child elements, which also fires dragleave on it)
+   * @param {DragEvent} event
+   * @private
+   */
+  _onDragLeaveExternal(event) {
+    const box = event.target.closest?.('.playlist-section[data-section]');
+    if (!box) return;
+    if (event.relatedTarget && box.contains(event.relatedTarget)) return;
+    box.classList.remove('drop-hover');
   }
 
   /**
@@ -400,18 +684,17 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
         log(2, `Failed to handle external drop: no section configuration found for '${section}'`);
         return false;
       }
-      const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
-      if (playlist.mode === unsequencedMode && !sound) {
-        sound = playlist.sounds.contents[0] || Array.from(playlist.sounds.values())[0] || null;
-      }
-      const targetMood = this.selectedMood || '';
+      const targetMood = event.currentTarget.dataset.moodId !== undefined ? event.currentTarget.dataset.moodId : this.selectedMood || '';
       const moodPath = targetMood ? `music.${section}.moods.${targetMood}` : `music.${section}`;
-      const updateData = { [`${moodPath}.playlist`]: playlist.id, [`${moodPath}.initialTrack`]: sound?.id || '' };
       const currentData = getProperty(this.document, this.updateDataPrefix) || {};
+      const existingTrackId = getProperty(currentData, `${moodPath}.initialTrack`) || null;
+      const initialTrackId = sound ? sound.id : resolveInitialTrack(playlist.id, existingTrackId);
+      const updateData = { [`${moodPath}.playlist`]: playlist.id };
+      if (initialTrackId) updateData[`${moodPath}.initialTrack`] = initialTrackId;
       const prevData = getProperty(currentData, moodPath);
       if (!prevData?.priority) updateData[`${moodPath}.priority`] = sectionConfig.priority;
       await this.updateObject(updateData);
-      log(3, `Successfully handled external drop: assigned playlist '${playlist.name}' and track '${sound?.name || 'Default'}' to section '${section}' (mood: '${targetMood || 'default'}')`);
+      log(3, `Successfully handled external drop: assigned playlist '${playlist.name}' (track: '${initialTrackId || 'none'}') to section '${section}' (mood: '${targetMood || 'default'}')`);
       return true;
     } catch (error) {
       log(1, 'Error handling external drop:', error);
@@ -499,16 +782,6 @@ export class VGMusicConfig extends HandlebarsApplicationMixin(ApplicationV2) {
       this.document = actor.prototypeToken;
       this.render(false);
       return result;
-    }
-    if (this.document.documentName === 'DefaultMusic') {
-      const prevData = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
-      const updateData = foundry.utils.mergeObject(prevData, foundry.utils.expandObject(expandedData), {
-        inplace: false,
-        performDeletions: true
-      });
-      await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
-      this.document = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
-      return this.render();
     }
   }
 

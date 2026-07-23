@@ -76,7 +76,7 @@ export function handleSceneConfigRender(app, html) {
     button.innerHTML = `<i class="fas fa-music"></i> ${_loc('VGMusic.ConfigTitle')}`;
     const hint = document.createElement('p');
     hint.className = 'hint';
-    hint.textContent = _loc('VGMusic.Settings.DefaultMusic.Hint');
+    hint.textContent = _loc('VGMusic.SceneConfig.Hint');
     formFields.appendChild(button);
     newFormGroup.appendChild(label);
     newFormGroup.appendChild(formFields);

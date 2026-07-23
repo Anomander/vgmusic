@@ -23,16 +23,11 @@ describe('CONST', () => {
   });
 
   it('playlistSections contains configurations for expected document types', () => {
-    expect(CONST.playlistSections.DefaultMusic).toBeDefined();
     expect(CONST.playlistSections.Scene).toBeDefined();
-    expect(CONST.playlistSections.Actor).toBeDefined();
     expect(CONST.playlistSections.Token).toBeDefined();
 
-    expect(CONST.playlistSections.DefaultMusic.area.priority).toBe(-40);
-    expect(CONST.playlistSections.DefaultMusic.combat.priority).toBe(-35);
     expect(CONST.playlistSections.Scene.area.priority).toBe(-20);
     expect(CONST.playlistSections.Scene.combat.priority).toBe(-15);
-    expect(CONST.playlistSections.Actor.combat.priority).toBe(0);
     expect(CONST.playlistSections.Token.combat.priority).toBe(20);
   });
 });

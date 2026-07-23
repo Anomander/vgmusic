@@ -48,7 +48,7 @@
           {{#unless this.isCardCollapsed}}
           <div class="context-boxes flexrow">
             <!-- Area Sub-Card -->
-            <div class="context-box area-box flexcol">
+            <div class="context-box area-box flexcol" data-drop-scope="scene" data-context-type="area" data-mood-id="{{this.moodId}}">
               <div class="context-box-header flexrow">
                 <span class="box-title"><i class="fas fa-compass"></i> Area</span>
                 {{#if area.playlistId}}
@@ -81,7 +81,7 @@
             </div>
 
             <!-- Combat Sub-Card -->
-            <div class="context-box combat-box flexcol">
+            <div class="context-box combat-box flexcol" data-drop-scope="scene" data-context-type="combat" data-mood-id="{{this.moodId}}">
               <div class="context-box-header flexrow">
                 <span class="box-title"><i class="fas fa-swords"></i> Combat</span>
                 {{#if combat.playlistId}}
@@ -136,7 +136,7 @@
       <div class="tree-node-body default-fields">
         <div class="context-boxes flexrow">
           <!-- Area Sub-Card -->
-          <div class="context-box area-box flexcol">
+          <div class="context-box area-box flexcol" data-drop-scope="scene" data-context-type="area">
             <div class="context-box-header flexrow">
               <span class="box-title"><i class="fas fa-compass"></i> Area</span>
               {{#if sceneDefaults.area.playlistId}}
@@ -169,7 +169,7 @@
           </div>
 
           <!-- Combat Sub-Card -->
-          <div class="context-box combat-box flexcol">
+          <div class="context-box combat-box flexcol" data-drop-scope="scene" data-context-type="combat">
             <div class="context-box-header flexrow">
               <span class="box-title"><i class="fas fa-swords"></i> Combat</span>
               {{#if sceneDefaults.combat.playlistId}}
@@ -231,7 +231,7 @@
           {{#unless this.isCardCollapsed}}
           <div class="context-boxes flexrow">
             <!-- Area Sub-Card -->
-            <div class="context-box area-box flexcol">
+            <div class="context-box area-box flexcol" data-drop-scope="global" data-context-type="area" data-mood-id="{{this.moodId}}">
               <div class="context-box-header flexrow">
                 <span class="box-title"><i class="fas fa-compass"></i> Area</span>
                 {{#if area.playlistId}}
@@ -264,7 +264,7 @@
             </div>
 
             <!-- Combat Sub-Card -->
-            <div class="context-box combat-box flexcol">
+            <div class="context-box combat-box flexcol" data-drop-scope="global" data-context-type="combat" data-mood-id="{{this.moodId}}">
               <div class="context-box-header flexrow">
                 <span class="box-title"><i class="fas fa-swords"></i> Combat</span>
                 {{#if combat.playlistId}}
@@ -319,7 +319,7 @@
       <div class="tree-node-body default-fields">
         <div class="context-boxes flexrow">
           <!-- Fallback Area Sub-Card -->
-          <div class="context-box area-box flexcol">
+          <div class="context-box area-box flexcol" data-drop-scope="global" data-context-type="area">
             <div class="context-box-header flexrow">
               <span class="box-title"><i class="fas fa-compass"></i> Fallback Area</span>
               {{#if globalDefaults.area.playlistId}}
@@ -352,7 +352,7 @@
           </div>
 
           <!-- Fallback Combat Sub-Card -->
-          <div class="context-box combat-box flexcol">
+          <div class="context-box combat-box flexcol" data-drop-scope="global" data-context-type="combat">
             <div class="context-box-header flexrow">
               <span class="box-title"><i class="fas fa-swords"></i> Fallback Combat</span>
               {{#if globalDefaults.combat.playlistId}}

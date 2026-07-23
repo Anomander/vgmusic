@@ -281,7 +281,10 @@
   gap: 12px;
 }
 
-.vgmusic-playlist-tree .tree-node {
+/* The following mood-grid/context-box component styles are shared between the
+   Playlist Hierarchy Tree and VGMusicConfig's token mood-grid layout. */
+.vgmusic-playlist-tree .tree-node,
+.vgmusic-mood-grid .tree-node {
   border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.15));
   border-radius: 6px;
   background: var(--color-bg-option, rgba(15, 15, 25, 0.6));
@@ -289,12 +292,14 @@
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.vgmusic-playlist-tree .tree-node.is-resolving {
+.vgmusic-playlist-tree .tree-node.is-resolving,
+.vgmusic-mood-grid .tree-node.is-resolving {
   border-color: #2ecc71;
   box-shadow: 0 0 8px rgba(46, 204, 113, 0.3);
 }
 
-.vgmusic-playlist-tree .tree-node-header {
+.vgmusic-playlist-tree .tree-node-header,
+.vgmusic-mood-grid .tree-node-header {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
@@ -303,24 +308,28 @@
   border-radius: 4px;
 }
 
-.vgmusic-playlist-tree .tree-node-header.clickable {
+.vgmusic-playlist-tree .tree-node-header.clickable,
+.vgmusic-mood-grid .tree-node-header.clickable {
   cursor: pointer;
   user-select: none;
   transition: background 0.15ease;
 }
 
-.vgmusic-playlist-tree .tree-node-header.clickable:hover {
+.vgmusic-playlist-tree .tree-node-header.clickable:hover,
+.vgmusic-mood-grid .tree-node-header.clickable:hover {
   background: rgba(255, 255, 255, 0.05);
 }
 
-.vgmusic-playlist-tree .section-chevron {
+.vgmusic-playlist-tree .section-chevron,
+.vgmusic-mood-grid .section-chevron {
   width: 14px;
   text-align: center;
   color: var(--color-text-subtle, #aaa);
   transition: transform 0.15s ease;
 }
 
-.vgmusic-playlist-tree .node-title {
+.vgmusic-playlist-tree .node-title,
+.vgmusic-mood-grid .node-title {
   font-weight: bold;
   font-size: 1.05em;
   display: flex;
@@ -328,19 +337,22 @@
   gap: 8px;
 }
 
-.vgmusic-playlist-tree .resolving-badge {
+.vgmusic-playlist-tree .resolving-badge,
+.vgmusic-mood-grid .resolving-badge {
   font-size: 0.8em;
   color: #2ecc71;
   font-weight: bold;
 }
 
-.vgmusic-playlist-tree .mood-grid {
+.vgmusic-playlist-tree .mood-grid,
+.vgmusic-mood-grid .mood-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 10px;
 }
 
-.vgmusic-playlist-tree .mood-card {
+.vgmusic-playlist-tree .mood-card,
+.vgmusic-mood-grid .mood-card {
   border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.15));
   border-radius: 6px;
   padding: 8px;
@@ -349,12 +361,15 @@
 }
 
 .vgmusic-playlist-tree .mood-card.resolving-mood,
-.vgmusic-playlist-tree .mood-card.is-resolving {
+.vgmusic-playlist-tree .mood-card.is-resolving,
+.vgmusic-mood-grid .mood-card.resolving-mood,
+.vgmusic-mood-grid .mood-card.is-resolving {
   border-color: #2ecc71 !important;
   box-shadow: 0 0 8px rgba(46, 204, 113, 0.4);
 }
 
-.vgmusic-playlist-tree .mood-card-header {
+.vgmusic-playlist-tree .mood-card-header,
+.vgmusic-mood-grid .mood-card-header {
   font-weight: bold;
   display: flex;
   align-items: center;
@@ -363,7 +378,8 @@
   color: var(--mood-color, #3b82f6);
 }
 
-.vgmusic-playlist-tree .mood-card-header.clickable {
+.vgmusic-playlist-tree .mood-card-header.clickable,
+.vgmusic-mood-grid .mood-card-header.clickable {
   cursor: pointer;
   user-select: none;
   border-radius: 4px;
@@ -371,7 +387,8 @@
   transition: background 0.15s ease;
 }
 
-.vgmusic-playlist-tree .mood-card-header.clickable:hover {
+.vgmusic-playlist-tree .mood-card-header.clickable:hover,
+.vgmusic-mood-grid .mood-card-header.clickable:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
@@ -380,16 +397,25 @@
   gap: 8px;
 }
 
-.vgmusic-playlist-tree .context-box {
+.vgmusic-playlist-tree .context-box,
+.vgmusic-mood-grid .context-box {
   flex: 1;
   min-width: 0;
   border: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.12));
   border-radius: 4px;
   padding: 6px 8px;
   background: rgba(0, 0, 0, 0.15);
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
-.vgmusic-playlist-tree .context-box-header {
+.vgmusic-playlist-tree .context-box.drop-hover,
+.vgmusic-mood-grid .context-box.drop-hover {
+  border-color: #2ecc71;
+  background: rgba(46, 204, 113, 0.12);
+}
+
+.vgmusic-playlist-tree .context-box-header,
+.vgmusic-mood-grid .context-box-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -398,7 +424,8 @@
   border-bottom: 1px solid var(--color-border-subtle, rgba(255, 255, 255, 0.08));
 }
 
-.vgmusic-playlist-tree .context-box-header .box-title {
+.vgmusic-playlist-tree .context-box-header .box-title,
+.vgmusic-mood-grid .context-box-header .box-title {
   font-size: 0.85em;
   font-weight: bold;
   display: flex;
@@ -407,19 +434,22 @@
   color: var(--color-text-light, #e0e0e0);
 }
 
-.vgmusic-playlist-tree .context-box-body {
+.vgmusic-playlist-tree .context-box-body,
+.vgmusic-mood-grid .context-box-body {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.vgmusic-playlist-tree .track-row {
+.vgmusic-playlist-tree .track-row,
+.vgmusic-mood-grid .track-row {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.vgmusic-playlist-tree select {
+.vgmusic-playlist-tree select,
+.vgmusic-mood-grid .context-box select {
   width: 100%;
   height: 28px;
   padding: 2px 4px;
@@ -427,7 +457,12 @@
   border-radius: 4px;
 }
 
-.vgmusic-playlist-tree .soundboard-required-badge {
+/* Foundry's core .flexrow > * rule gives every direct child flex: 1, which
+   splits the row 50/50 between the badge and the select. Pin the badge to
+   its content width so the select gets the rest. */
+.vgmusic-playlist-tree .track-row .soundboard-required-badge,
+.vgmusic-mood-grid .track-row .soundboard-required-badge {
+  flex: 0 0 auto;
   color: #ef4444;
   font-weight: bold;
   font-size: 1.1em;
@@ -435,7 +470,14 @@
   cursor: help;
 }
 
-.vgmusic-playlist-tree .clear-btn {
+.vgmusic-playlist-tree .track-row select,
+.vgmusic-mood-grid .track-row select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.vgmusic-playlist-tree .clear-btn,
+.vgmusic-mood-grid .clear-btn {
   flex: 0 0 22px;
   height: 22px;
   width: 22px;
@@ -450,8 +492,13 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-.vgmusic-playlist-tree .clear-btn:hover {
+.vgmusic-playlist-tree .clear-btn:hover,
+.vgmusic-mood-grid .clear-btn:hover {
   background: rgba(239, 68, 68, 0.3);
+}
+
+.vgmusic-mood-grid {
+  gap: 12px;
 }
 
 .vgmusic-playlist-tree .tree-footer-bar {

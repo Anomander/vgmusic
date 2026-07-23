@@ -368,7 +368,7 @@ describe('PlaylistTreeApp', () => {
   });
 
   describe('_onRender event listener management', () => {
-    it('attaches change event listener only once even after multiple _onRender calls', () => {
+    it('attaches change and dragleave listeners only once each, even after multiple _onRender calls', () => {
       const mockElement = {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn()
@@ -379,11 +379,12 @@ describe('PlaylistTreeApp', () => {
       app._onRender({}, {});
       app._onRender({}, {});
 
-      expect(mockElement.addEventListener).toHaveBeenCalledTimes(1);
+      expect(mockElement.addEventListener).toHaveBeenCalledTimes(2);
       expect(mockElement.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+      expect(mockElement.addEventListener).toHaveBeenCalledWith('dragleave', expect.any(Function));
     });
 
-    it('removes change event listener on _onClose and resets flag', () => {
+    it('removes change and dragleave listeners on _onClose and resets flags', () => {
       const mockElement = {
         addEventListener: vi.fn(),
         removeEventListener: vi.fn()
@@ -392,10 +393,122 @@ describe('PlaylistTreeApp', () => {
 
       app._onRender({}, {});
       expect(app._changeListenerBound).toBe(true);
+      expect(app._dragLeaveListenerBound).toBe(true);
 
       app._onClose({});
       expect(mockElement.removeEventListener).toHaveBeenCalledWith('change', app._onChangeInputHandler);
+      expect(mockElement.removeEventListener).toHaveBeenCalledWith('dragleave', app._onDragLeaveHandler);
       expect(app._changeListenerBound).toBe(false);
+      expect(app._dragLeaveListenerBound).toBe(false);
+    });
+  });
+
+  describe('_onDropExternal (drag-and-drop from the Playlists directory)', () => {
+    class MockPlaylistDoc {
+      constructor(data) {
+        Object.assign(this, data);
+      }
+    }
+    class MockPlaylistSoundDoc {
+      constructor(data) {
+        Object.assign(this, data);
+      }
+    }
+
+    beforeEach(() => {
+      globalThis.Playlist = MockPlaylistDoc;
+      globalThis.PlaylistSound = MockPlaylistSoundDoc;
+    });
+
+    function makeDropEvent(payload, dataset) {
+      return {
+        currentTarget: { classList: { add: vi.fn(), remove: vi.fn() }, dataset },
+        dataTransfer: { getData: vi.fn(() => JSON.stringify(payload)) }
+      };
+    }
+
+    it('assigns a dropped Playlist to a scene mood area box', async () => {
+      const droppedPlaylist = new MockPlaylistDoc({ id: 'pl-area', name: 'Area Playlist', mode: 0 });
+      globalThis.fromUuid = vi.fn().mockResolvedValue(droppedPlaylist);
+      game.playlists.get = vi.fn((id) => (id === 'pl-area' ? droppedPlaylist : null));
+
+      const event = makeDropEvent({ type: 'Playlist', uuid: 'Playlist.pl-area' }, { dropScope: 'scene', contextType: 'area', moodId: 'boss' });
+
+      const result = await app._onDropExternal(event);
+
+      expect(result).toBe(true);
+      expect(scene1.setFlag).toHaveBeenCalledWith(CONST.moduleId, 'music.area.moods.boss.playlist', 'pl-area');
+      expect(game.vgmusic.musicController.playCurrentTrack).toHaveBeenCalled();
+    });
+
+    it('assigns a dropped PlaylistSound as the exact track on the global default combat box', async () => {
+      const parentPlaylist = { id: 'pl-combat', name: 'Combat Playlist' };
+      const droppedSound = new MockPlaylistSoundDoc({ id: 'tr-1', name: 'Track One', parent: parentPlaylist });
+      globalThis.fromUuid = vi.fn().mockResolvedValue(droppedSound);
+      setMockSetting('vgmusic', 'defaultMusic', { documentName: 'DefaultMusic', data: { vgmusic: { music: {} } } });
+
+      const event = makeDropEvent({ type: 'PlaylistSound', uuid: 'Playlist.pl-combat.PlaylistSound.tr-1' }, { dropScope: 'global', contextType: 'combat' });
+
+      const result = await app._onDropExternal(event);
+
+      expect(result).toBe(true);
+      expect(game.settings.set).toHaveBeenCalledWith(
+        CONST.moduleId,
+        CONST.settings.defaultMusic,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            vgmusic: expect.objectContaining({
+              music: expect.objectContaining({
+                combat: { playlist: 'pl-combat', initialTrack: 'tr-1' }
+              })
+            })
+          })
+        })
+      );
+    });
+
+    it('ignores drops with unsupported document types', async () => {
+      globalThis.fromUuid = vi.fn();
+      const event = makeDropEvent({ type: 'Actor', uuid: 'Actor.abc' }, {});
+
+      const result = await app._onDropExternal(event);
+
+      expect(result).toBe(false);
+      expect(globalThis.fromUuid).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('_onDragLeaveExternal', () => {
+    it('clears drop-hover when the drag genuinely leaves the context box', () => {
+      const box = {
+        contains: vi.fn(() => false),
+        classList: { remove: vi.fn() }
+      };
+      const child = { closest: vi.fn(() => box) };
+      const outsideEl = {};
+
+      app._onDragLeaveExternal({ target: child, relatedTarget: outsideEl });
+
+      expect(box.classList.remove).toHaveBeenCalledWith('drop-hover');
+    });
+
+    it('does not clear drop-hover when the drag moves between child elements of the same box', () => {
+      const box = {
+        contains: vi.fn(() => true),
+        classList: { remove: vi.fn() }
+      };
+      const child = { closest: vi.fn(() => box) };
+      const otherChildOfSameBox = {};
+
+      app._onDragLeaveExternal({ target: child, relatedTarget: otherChildOfSameBox });
+
+      expect(box.classList.remove).not.toHaveBeenCalled();
+    });
+
+    it('does nothing when the drag leaves an element outside any context box', () => {
+      const target = { closest: vi.fn(() => null) };
+
+      expect(() => app._onDragLeaveExternal({ target, relatedTarget: null })).not.toThrow();
     });
   });
 });
