@@ -159,7 +159,7 @@ export class MusicController {
       log(3, `Preparing to play track '${targetTrack.name}' from position ${savedPosition}s (targetVolume: ${originalVolume}, fadeIn: ${fadeDurationMs > 0})`);
 
       if (fadeDurationMs > 0) {
-        await targetTrack.update({ offset: savedPosition, volume: 0 });
+        await targetTrack.update({ offset: savedPosition });
         await this.playTrack(targetTrack);
         this._fadeInWhenReady(targetTrack, fadeDurationMs, originalVolume);
       } else {
@@ -414,14 +414,11 @@ export class MusicController {
       const isReady = track.sound ? (track.sound.loaded || track.sound.playing || track.playing || attempts >= maxAttempts) : true;
 
       if (isReady) {
-        log(3, `Track '${track.name}' audio ready. Applying volume fade to ${finalVolume} over ${fadeDurationMs}ms.`);
+        log(3, `Track '${track.name}' audio ready. Applying in-memory volume fade to ${finalVolume} over ${fadeDurationMs}ms.`);
         if (typeof soundObj?.fade === 'function') {
-          soundObj.fade(finalVolume, { duration: fadeDurationMs }).then(() => {
-            track.update({ volume: finalVolume }).catch(() => {});
-          });
+          soundObj.fade(finalVolume, { duration: fadeDurationMs, from: 0 });
         } else if (typeof soundObj?.volume !== 'undefined') {
           soundObj.volume = finalVolume;
-          track.update({ volume: finalVolume }).catch(() => {});
         }
       } else {
         setTimeout(waitForAudio, 100);
