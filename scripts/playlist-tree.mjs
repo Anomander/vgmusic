@@ -28,7 +28,6 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
       updateGlobalDefault: PlaylistTreeApp.handleUpdateGlobalDefault,
       updateGlobalDefaultTrack: PlaylistTreeApp.handleUpdateGlobalDefaultTrack,
       clearGlobalDefault: PlaylistTreeApp.handleClearGlobalDefault,
-      clearGlobalDefaultTrack: PlaylistTreeApp.handleUpdateGlobalDefaultTrack,
       openMoodConfig: PlaylistTreeApp.handleOpenMoodConfig,
       toggleSection: PlaylistTreeApp.handleToggleSection
     }
@@ -239,8 +238,38 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
   /** @override */
   _onRender(context, options) {
     super._onRender(context, options);
-    this.element?.addEventListener('change', (event) => this._onChangeInput(event));
+    if (this.element && !this._changeListenerBound) {
+      this._onChangeInputHandler = (event) => this._onChangeInput(event);
+      this.element.addEventListener('change', this._onChangeInputHandler);
+      this._changeListenerBound = true;
+    }
   }
+
+  /** @override */
+  _onClose(options) {
+    super._onClose(options);
+    if (this.element && this._onChangeInputHandler) {
+      this.element.removeEventListener('change', this._onChangeInputHandler);
+    }
+    this._changeListenerBound = false;
+  }
+
+  /**
+   * Maps `data-change-action` values to their handler method name. Looked up
+   * dynamically on the class (rather than captured by reference) so that
+   * spying/mocking a handler is honored by dispatch.
+   */
+  static _CHANGE_ACTIONS = {
+    selectScene: 'handleSelectScene',
+    updateSceneMood: 'handleUpdateSceneMood',
+    updateSceneMoodTrack: 'handleUpdateSceneMoodTrack',
+    updateSceneDefault: 'handleUpdateSceneDefault',
+    updateSceneDefaultTrack: 'handleUpdateSceneDefaultTrack',
+    updateGlobalMood: 'handleUpdateGlobalMood',
+    updateGlobalMoodTrack: 'handleUpdateGlobalMoodTrack',
+    updateGlobalDefault: 'handleUpdateGlobalDefault',
+    updateGlobalDefaultTrack: 'handleUpdateGlobalDefaultTrack'
+  };
 
   /**
    * Internal delegated change event listener for select inputs
@@ -250,26 +279,9 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
   _onChangeInput(event) {
     const target = event.target;
     if (!target || target.tagName !== 'SELECT') return;
-    const action = target.dataset.changeAction;
-    if (action === 'selectScene') {
-      PlaylistTreeApp.handleSelectScene.call(this, event, target);
-    } else if (action === 'updateSceneMood') {
-      PlaylistTreeApp.handleUpdateSceneMood.call(this, event, target);
-    } else if (action === 'updateSceneMoodTrack') {
-      PlaylistTreeApp.handleUpdateSceneMoodTrack.call(this, event, target);
-    } else if (action === 'updateSceneDefault') {
-      PlaylistTreeApp.handleUpdateSceneDefault.call(this, event, target);
-    } else if (action === 'updateSceneDefaultTrack') {
-      PlaylistTreeApp.handleUpdateSceneDefaultTrack.call(this, event, target);
-    } else if (action === 'updateGlobalMood') {
-      PlaylistTreeApp.handleUpdateGlobalMood.call(this, event, target);
-    } else if (action === 'updateGlobalMoodTrack') {
-      PlaylistTreeApp.handleUpdateGlobalMoodTrack.call(this, event, target);
-    } else if (action === 'updateGlobalDefault') {
-      PlaylistTreeApp.handleUpdateGlobalDefault.call(this, event, target);
-    } else if (action === 'updateGlobalDefaultTrack') {
-      PlaylistTreeApp.handleUpdateGlobalDefaultTrack.call(this, event, target);
-    }
+    const methodName = PlaylistTreeApp._CHANGE_ACTIONS[target.dataset.changeAction];
+    const handler = methodName && PlaylistTreeApp[methodName];
+    if (typeof handler === 'function') handler.call(this, event, target);
   }
 
   /**
@@ -277,10 +289,20 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
    */
   static handleSelectScene(event, target) {
     const select = target.closest('select') || target;
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
+    const instance = PlaylistTreeApp._resolveInstance(this);
     if (!instance) return;
     instance.selectedSceneId = select.value || 'global';
     instance.render(false);
+  }
+
+  /**
+   * Resolve the active app instance from a static-handler call context
+   * @param {*} context - `this` inside the calling static handler
+   * @returns {PlaylistTreeApp|null}
+   * @private
+   */
+  static _resolveInstance(context) {
+    return game.vgmusic?.playlistTree || (context instanceof PlaylistTreeApp ? context : null);
   }
 
   /**
@@ -294,6 +316,98 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
   }
 
   /**
+   * Build the flag/setting path for a music section, optionally scoped to a mood
+   * @private
+   */
+  static _buildPath(contextType, moodId) {
+    return moodId ? `music.${contextType}.moods.${moodId}` : `music.${contextType}`;
+  }
+
+  /**
+   * Resolve the initial track to store alongside a playlist selection: keeps
+   * the existing track if one is set, otherwise auto-assigns the first track
+   * for Soundboard (UNSEQUENCED) playlists
+   * @private
+   */
+  static _resolveInitialTrack(playlistId, existingTrackId) {
+    let initialTrackId = existingTrackId || null;
+    const playlist = PlaylistTreeApp._getPlaylist(playlistId);
+    const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
+    if (playlist?.mode === unsequencedMode && !initialTrackId) {
+      const firstTrack = (playlist.sounds?.contents || Array.from(playlist.sounds?.values() || []))[0];
+      if (firstTrack) initialTrackId = firstTrack.id;
+    }
+    return initialTrackId;
+  }
+
+  /**
+   * Apply a playlist selection (or clear it, when playlistId is null) to a scene flag entry
+   * @private
+   */
+  static async _applySceneEntry(scene, path, playlistId) {
+    if (playlistId) {
+      const existingTrackId = scene.getFlag(CONST.moduleId, `${path}.initialTrack`) || null;
+      const initialTrackId = PlaylistTreeApp._resolveInitialTrack(playlistId, existingTrackId);
+      await scene.setFlag(CONST.moduleId, `${path}.playlist`, playlistId);
+      if (initialTrackId) await scene.setFlag(CONST.moduleId, `${path}.initialTrack`, initialTrackId);
+    } else {
+      await scene.unsetFlag(CONST.moduleId, `${path}.playlist`);
+      await scene.unsetFlag(CONST.moduleId, `${path}.initialTrack`);
+    }
+  }
+
+  /**
+   * Apply a track selection (or clear it, when trackId is null) to a scene flag entry
+   * @private
+   */
+  static async _applySceneTrack(scene, path, trackId) {
+    if (trackId) await scene.setFlag(CONST.moduleId, `${path}.initialTrack`, trackId);
+    else await scene.unsetFlag(CONST.moduleId, `${path}.initialTrack`);
+  }
+
+  /**
+   * Apply a playlist selection (or clear it, when playlistId is null) to the global defaultMusic setting
+   * @private
+   */
+  static async _applyGlobalEntry(path, playlistId) {
+    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
+    const updateData = foundry.utils.deepClone(prevConfig);
+
+    if (playlistId) {
+      const existingTrackId = foundry.utils.getProperty(updateData, `data.vgmusic.${path}.initialTrack`) || null;
+      const initialTrackId = PlaylistTreeApp._resolveInitialTrack(playlistId, existingTrackId);
+      foundry.utils.setProperty(updateData, `data.vgmusic.${path}.playlist`, playlistId);
+      if (initialTrackId) foundry.utils.setProperty(updateData, `data.vgmusic.${path}.initialTrack`, initialTrackId);
+    } else {
+      const section = foundry.utils.getProperty(updateData, `data.vgmusic.${path}`);
+      if (section) {
+        delete section.playlist;
+        delete section.initialTrack;
+      }
+    }
+
+    await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+  }
+
+  /**
+   * Apply a track selection (or clear it, when trackId is null) to the global defaultMusic setting
+   * @private
+   */
+  static async _applyGlobalTrack(path, trackId) {
+    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
+    const updateData = foundry.utils.deepClone(prevConfig);
+
+    if (trackId) {
+      foundry.utils.setProperty(updateData, `data.vgmusic.${path}.initialTrack`, trackId);
+    } else {
+      const section = foundry.utils.getProperty(updateData, `data.vgmusic.${path}`);
+      if (section) delete section.initialTrack;
+    }
+
+    await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+  }
+
+  /**
    * Handle updating scene mood playlist
    */
   static async handleUpdateSceneMood(event, target) {
@@ -302,29 +416,12 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const playlistId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
+    const instance = PlaylistTreeApp._resolveInstance(this);
     const scene = game.scenes?.get(instance?.selectedSceneId);
     if (!scene) return;
 
     try {
-      if (playlistId) {
-        const playlist = PlaylistTreeApp._getPlaylist(playlistId);
-        const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
-        let initialTrackId = scene.getFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.initialTrack`) || null;
-
-        if (playlist?.mode === unsequencedMode && !initialTrackId) {
-          const firstTrack = (playlist.sounds?.contents || Array.from(playlist.sounds?.values() || []))[0];
-          if (firstTrack) initialTrackId = firstTrack.id;
-        }
-
-        await scene.setFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.playlist`, playlistId);
-        if (initialTrackId) {
-          await scene.setFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.initialTrack`, initialTrackId);
-        }
-      } else {
-        await scene.unsetFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.playlist`);
-        await scene.unsetFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.initialTrack`);
-      }
+      await PlaylistTreeApp._applySceneEntry(scene, PlaylistTreeApp._buildPath(contextType, moodId), playlistId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -341,16 +438,12 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const trackId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
+    const instance = PlaylistTreeApp._resolveInstance(this);
     const scene = game.scenes?.get(instance?.selectedSceneId);
     if (!scene) return;
 
     try {
-      if (trackId) {
-        await scene.setFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.initialTrack`, trackId);
-      } else {
-        await scene.unsetFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.initialTrack`);
-      }
+      await PlaylistTreeApp._applySceneTrack(scene, PlaylistTreeApp._buildPath(contextType, moodId), trackId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -367,13 +460,12 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const moodId = btn.dataset.moodId;
     const contextType = btn.dataset.contextType || 'area';
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
+    const instance = PlaylistTreeApp._resolveInstance(this);
     const scene = game.scenes?.get(instance?.selectedSceneId);
     if (!scene) return;
 
     try {
-      await scene.unsetFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.playlist`);
-      await scene.unsetFlag(CONST.moduleId, `music.${contextType}.moods.${moodId}.initialTrack`);
+      await PlaylistTreeApp._applySceneEntry(scene, PlaylistTreeApp._buildPath(contextType, moodId), null);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -389,29 +481,12 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const playlistId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
+    const instance = PlaylistTreeApp._resolveInstance(this);
     const scene = game.scenes?.get(instance?.selectedSceneId);
     if (!scene) return;
 
     try {
-      if (playlistId) {
-        const playlist = PlaylistTreeApp._getPlaylist(playlistId);
-        const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
-        let initialTrackId = scene.getFlag(CONST.moduleId, `music.${contextType}.initialTrack`) || null;
-
-        if (playlist?.mode === unsequencedMode && !initialTrackId) {
-          const firstTrack = (playlist.sounds?.contents || Array.from(playlist.sounds?.values() || []))[0];
-          if (firstTrack) initialTrackId = firstTrack.id;
-        }
-
-        await scene.setFlag(CONST.moduleId, `music.${contextType}.playlist`, playlistId);
-        if (initialTrackId) {
-          await scene.setFlag(CONST.moduleId, `music.${contextType}.initialTrack`, initialTrackId);
-        }
-      } else {
-        await scene.unsetFlag(CONST.moduleId, `music.${contextType}.playlist`);
-        await scene.unsetFlag(CONST.moduleId, `music.${contextType}.initialTrack`);
-      }
+      await PlaylistTreeApp._applySceneEntry(scene, PlaylistTreeApp._buildPath(contextType, null), playlistId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -427,16 +502,12 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const trackId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
+    const instance = PlaylistTreeApp._resolveInstance(this);
     const scene = game.scenes?.get(instance?.selectedSceneId);
     if (!scene) return;
 
     try {
-      if (trackId) {
-        await scene.setFlag(CONST.moduleId, `music.${contextType}.initialTrack`, trackId);
-      } else {
-        await scene.unsetFlag(CONST.moduleId, `music.${contextType}.initialTrack`);
-      }
+      await PlaylistTreeApp._applySceneTrack(scene, PlaylistTreeApp._buildPath(contextType, null), trackId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -452,13 +523,12 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const btn = target.closest('[data-context-type]') || target;
     const contextType = btn.dataset.contextType || 'area';
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
+    const instance = PlaylistTreeApp._resolveInstance(this);
     const scene = game.scenes?.get(instance?.selectedSceneId);
     if (!scene) return;
 
     try {
-      await scene.unsetFlag(CONST.moduleId, `music.${contextType}.playlist`);
-      await scene.unsetFlag(CONST.moduleId, `music.${contextType}.initialTrack`);
+      await PlaylistTreeApp._applySceneEntry(scene, PlaylistTreeApp._buildPath(contextType, null), null);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -475,33 +545,10 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const playlistId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
-    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
-    const updateData = foundry.utils.deepClone(prevConfig);
-
-    if (playlistId) {
-      const playlist = PlaylistTreeApp._getPlaylist(playlistId);
-      const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
-      let initialTrackId = updateData.data?.vgmusic?.music?.[contextType]?.moods?.[moodId]?.initialTrack || null;
-
-      if (playlist?.mode === unsequencedMode && !initialTrackId) {
-        const firstTrack = (playlist.sounds?.contents || Array.from(playlist.sounds?.values() || []))[0];
-        if (firstTrack) initialTrackId = firstTrack.id;
-      }
-
-      foundry.utils.setProperty(updateData, `data.vgmusic.music.${contextType}.moods.${moodId}.playlist`, playlistId);
-      if (initialTrackId) {
-        foundry.utils.setProperty(updateData, `data.vgmusic.music.${contextType}.moods.${moodId}.initialTrack`, initialTrackId);
-      }
-    } else {
-      if (updateData.data?.vgmusic?.music?.[contextType]?.moods?.[moodId]) {
-        delete updateData.data.vgmusic.music[contextType].moods[moodId].playlist;
-        delete updateData.data.vgmusic.music[contextType].moods[moodId].initialTrack;
-      }
-    }
+    const instance = PlaylistTreeApp._resolveInstance(this);
 
     try {
-      await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+      await PlaylistTreeApp._applyGlobalEntry(PlaylistTreeApp._buildPath(contextType, moodId), playlistId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -518,20 +565,10 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const trackId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
-    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
-    const updateData = foundry.utils.deepClone(prevConfig);
-
-    if (trackId) {
-      foundry.utils.setProperty(updateData, `data.vgmusic.music.${contextType}.moods.${moodId}.initialTrack`, trackId);
-    } else {
-      if (updateData.data?.vgmusic?.music?.[contextType]?.moods?.[moodId]) {
-        delete updateData.data.vgmusic.music[contextType].moods[moodId].initialTrack;
-      }
-    }
+    const instance = PlaylistTreeApp._resolveInstance(this);
 
     try {
-      await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+      await PlaylistTreeApp._applyGlobalTrack(PlaylistTreeApp._buildPath(contextType, moodId), trackId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -548,17 +585,10 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const moodId = btn.dataset.moodId;
     const contextType = btn.dataset.contextType || 'area';
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
-    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
-    const updateData = foundry.utils.deepClone(prevConfig);
-
-    if (updateData.data?.vgmusic?.music?.[contextType]?.moods?.[moodId]) {
-      delete updateData.data.vgmusic.music[contextType].moods[moodId].playlist;
-      delete updateData.data.vgmusic.music[contextType].moods[moodId].initialTrack;
-    }
+    const instance = PlaylistTreeApp._resolveInstance(this);
 
     try {
-      await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+      await PlaylistTreeApp._applyGlobalEntry(PlaylistTreeApp._buildPath(contextType, moodId), null);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -574,33 +604,10 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const playlistId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
-    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
-    const updateData = foundry.utils.deepClone(prevConfig);
-
-    if (playlistId) {
-      const playlist = PlaylistTreeApp._getPlaylist(playlistId);
-      const unsequencedMode = globalThis.CONST?.PLAYLIST_MODES?.UNSEQUENCED ?? -1;
-      let initialTrackId = updateData.data?.vgmusic?.music?.[contextType]?.initialTrack || null;
-
-      if (playlist?.mode === unsequencedMode && !initialTrackId) {
-        const firstTrack = (playlist.sounds?.contents || Array.from(playlist.sounds?.values() || []))[0];
-        if (firstTrack) initialTrackId = firstTrack.id;
-      }
-
-      foundry.utils.setProperty(updateData, `data.vgmusic.music.${contextType}.playlist`, playlistId);
-      if (initialTrackId) {
-        foundry.utils.setProperty(updateData, `data.vgmusic.music.${contextType}.initialTrack`, initialTrackId);
-      }
-    } else {
-      if (updateData.data?.vgmusic?.music?.[contextType]) {
-        delete updateData.data.vgmusic.music[contextType].playlist;
-        delete updateData.data.vgmusic.music[contextType].initialTrack;
-      }
-    }
+    const instance = PlaylistTreeApp._resolveInstance(this);
 
     try {
-      await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+      await PlaylistTreeApp._applyGlobalEntry(PlaylistTreeApp._buildPath(contextType, null), playlistId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -616,20 +623,10 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const contextType = select.dataset.contextType || 'area';
     const trackId = select.value || null;
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
-    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
-    const updateData = foundry.utils.deepClone(prevConfig);
-
-    if (trackId) {
-      foundry.utils.setProperty(updateData, `data.vgmusic.music.${contextType}.initialTrack`, trackId);
-    } else {
-      if (updateData.data?.vgmusic?.music?.[contextType]) {
-        delete updateData.data.vgmusic.music[contextType].initialTrack;
-      }
-    }
+    const instance = PlaylistTreeApp._resolveInstance(this);
 
     try {
-      await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+      await PlaylistTreeApp._applyGlobalTrack(PlaylistTreeApp._buildPath(contextType, null), trackId);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {
@@ -645,17 +642,10 @@ export class PlaylistTreeApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const btn = target.closest('[data-context-type]') || target;
     const contextType = btn.dataset.contextType || 'area';
 
-    const instance = game.vgmusic?.playlistTree || (this instanceof PlaylistTreeApp ? this : null);
-    const prevConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic) || {};
-    const updateData = foundry.utils.deepClone(prevConfig);
-
-    if (updateData.data?.vgmusic?.music?.[contextType]) {
-      delete updateData.data.vgmusic.music[contextType].playlist;
-      delete updateData.data.vgmusic.music[contextType].initialTrack;
-    }
+    const instance = PlaylistTreeApp._resolveInstance(this);
 
     try {
-      await game.settings.set(CONST.moduleId, CONST.settings.defaultMusic, updateData);
+      await PlaylistTreeApp._applyGlobalEntry(PlaylistTreeApp._buildPath(contextType, null), null);
       game.vgmusic?.musicController?.playCurrentTrack();
       instance?.render(false);
     } catch (error) {

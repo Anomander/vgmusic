@@ -52,6 +52,8 @@ class MockApplicationV2 {
   constructor(options = {}) {
     this.options = options;
   }
+  _onRender(context, options) {}
+  _onClose(options) {}
   render() {}
   close() {}
 }

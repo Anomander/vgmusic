@@ -239,7 +239,7 @@ export async function handleReady() {
 
   // Restore mood widget open state from the previous session
   try {
-    const pos = game.settings.get('vgmusic', 'moodWidgetPosition') || {};
+    const pos = game.settings.get(CONST.moduleId, CONST.settings.moodWidgetPosition) || {};
     if (pos.isOpen && game.vgmusic) {
       MoodWidget.open();
     }

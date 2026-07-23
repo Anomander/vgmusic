@@ -51,17 +51,6 @@ export function getProperty(object, path) {
 }
 
 /**
- * Set property on object using dot notation
- * @param {object} object - Target object
- * @param {string} path - Dot notation path
- * @param {*} value - Value to set
- * @returns {boolean} Whether the property was set
- */
-export function setProperty(object, path, value) {
-  return foundry.utils.setProperty(object, path, value);
-}
-
-/**
  * Identify the VGMusic document category for a given entity
  * @param {Document|object} doc - The document to identify
  * @returns {'Document'|'PrototypeToken'|'DefaultMusic'|null}
@@ -185,14 +174,15 @@ export class PlaylistContext {
    * @param {Document|object} document - Source document or data model
    * @param {string} type - Music type ('area' or 'combat')
    * @param {Document} scopeEntity - Scope entity for progress tracking
+   * @param {string} [activeMood] - Active mood ID; reads the setting when omitted
    * @returns {PlaylistContext|null} Created context or null
    */
-  static fromDocument(document, type = 'combat', scopeEntity = null) {
+  static fromDocument(document, type = 'combat', scopeEntity = null, activeMood = undefined) {
     if (!document) {
       log(3, `PlaylistContext.fromDocument: Document is null or undefined for type '${type}'`);
       return null;
     }
-    const activeMood = game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
+    activeMood = activeMood ?? (game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '');
     const docName = document.name || document.id || document?.constructor?.name;
 
     // Determine the music section based on document category

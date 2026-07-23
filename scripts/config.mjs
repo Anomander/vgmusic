@@ -4,7 +4,6 @@
 export const CONST = {
   moduleId: 'vgmusic',
   settings: {
-    silentCombatMusicMode: 'silentCombatMusicMode',
     defaultMusic: 'defaultMusic',
     suppressArea: 'suppressArea',
     suppressCombat: 'suppressCombat',
@@ -20,7 +19,6 @@ export const CONST = {
     { id: 'stealth', label: 'VGMusic.Mood.Stealth', icon: 'fas fa-user-ninja', color: '#9c27b0' },
     { id: 'victory', label: 'VGMusic.Mood.Victory', icon: 'fas fa-trophy', color: '#ffeb3b' }
   ],
-  silentModes: { highestPriority: 'highestPriority', lastActor: 'lastActor', area: 'area', generic: 'generic' },
   playlistSections: {
     DefaultMusic: {
       area: { label: 'VGMusic.PlaylistSection.Area', priority: -40 },
@@ -29,6 +27,5 @@ export const CONST = {
     Scene: { area: { label: 'VGMusic.PlaylistSection.Area', priority: -20 }, combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -15 } },
     Actor: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: 0 } },
     Token: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: 20 } }
-  },
-  documentSortPriority: ['Token', 'Actor', 'Scene', 'DefaultMusic']
+  }
 };

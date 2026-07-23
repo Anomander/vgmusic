@@ -42,13 +42,12 @@ https://github.com/Sayshal/vgmusic/releases/latest/download/module.json
 2. **Token music** — open Token Config (or Prototype Token), find the music button in the Identity tab to assign combat themes
 3. **Linked token override** — linked tokens can optionally use their own music instead of the actor's prototype config
 4. **Default music** — set a world-level fallback in module settings
-5. **Settings** — configure silent combat mode, fade duration, and suppression hotkeys
+5. **Settings** — configure fade duration and suppression hotkeys
 
 ## Settings
 
 | Setting | Description |
 |---|---|
-| Silent Combat Music Mode | What plays when the active combatant has no theme (highest priority, last actor, area music, or generic combat) |
 | Fade Duration | Crossfade time in seconds (0 = use per-sound fade) |
 | Default Music | World-level fallback combat playlist |
 

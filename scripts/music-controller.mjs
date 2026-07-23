@@ -213,19 +213,19 @@ export class MusicController {
     const contexts = [];
     const scene = this.currentScene;
     const combat = this.currentCombat;
+    const activeMood = game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
+
     if (scene) {
-      const ctx = PlaylistContext.fromDocument(scene, 'area', scene);
-      if (ctx) contexts.push(ctx);
-    }
-    if (scene) {
-      const ctx = PlaylistContext.fromDocument(scene, 'combat', scene);
-      if (ctx) contexts.push(ctx);
+      const areaCtx = PlaylistContext.fromDocument(scene, 'area', scene, activeMood);
+      if (areaCtx) contexts.push(areaCtx);
+      const combatCtx = PlaylistContext.fromDocument(scene, 'combat', scene, activeMood);
+      if (combatCtx) contexts.push(combatCtx);
     }
     if (combat?.combatant) {
       for (const combatant of combat.combatants) {
         const musicSource = this._getCombatantMusicSource(combatant.token, combatant.actor);
         if (musicSource) {
-          const ctx = PlaylistContext.fromDocument(musicSource, 'combat', combat);
+          const ctx = PlaylistContext.fromDocument(musicSource, 'combat', combat, activeMood);
           if (ctx) contexts.push(ctx);
         }
       }
@@ -233,59 +233,13 @@ export class MusicController {
     const defaultConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
     if (defaultConfig) {
       if (combat) {
-        const ctx = PlaylistContext.fromDocument(defaultConfig, 'combat', combat);
+        const ctx = PlaylistContext.fromDocument(defaultConfig, 'combat', combat, activeMood);
         if (ctx) contexts.push(ctx);
       }
-      const areaCtx = PlaylistContext.fromDocument(defaultConfig, 'area', scene);
+      const areaCtx = PlaylistContext.fromDocument(defaultConfig, 'area', scene, activeMood);
       if (areaCtx) contexts.push(areaCtx);
     }
     return contexts;
-  }
-
-  /**
-   * Check if a playlist is configured or managed by VGMusic
-   * @param {object} playlist - Playlist document to check
-   * @returns {boolean} True if playlist is managed by VGMusic
-   */
-  isManagedPlaylist(playlist) {
-    if (!playlist) return false;
-
-    if (this.currentContext?.playlist?.id === playlist.id) return true;
-
-    const hasPlaylistId = (musicData, id) => {
-      if (!musicData) return false;
-      for (const section of Object.values(musicData)) {
-        if (section?.playlist === id) return true;
-        if (section?.moods) {
-          for (const moodConfig of Object.values(section.moods)) {
-            if (moodConfig?.playlist === id) return true;
-          }
-        }
-      }
-      return false;
-    };
-
-    for (const scene of game.scenes || []) {
-      const sceneMusic = scene.getFlag(CONST.moduleId, 'music');
-      if (hasPlaylistId(sceneMusic, playlist.id)) return true;
-    }
-
-    for (const actor of game.actors || []) {
-      const actorMusic = actor.getFlag(CONST.moduleId, 'music');
-      if (hasPlaylistId(actorMusic, playlist.id)) return true;
-      const protoMusic = actor.prototypeToken?.flags?.[CONST.moduleId]?.music;
-      if (hasPlaylistId(protoMusic, playlist.id)) return true;
-    }
-
-    try {
-      const defaultConfig = game.settings.get(CONST.moduleId, CONST.settings.defaultMusic);
-      const defaultMusic = defaultConfig?.data?.vgmusic?.music;
-      if (hasPlaylistId(defaultMusic, playlist.id)) return true;
-    } catch (e) {
-      // setting not initialized
-    }
-
-    return false;
   }
 
   /**

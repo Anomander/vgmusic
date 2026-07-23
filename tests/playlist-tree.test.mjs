@@ -288,6 +288,37 @@ describe('PlaylistTreeApp', () => {
         'tr-sfx-1'
       );
     });
+
+    it('automatically assigns first track when selecting a Soundboard playlist for the global default (no mood)', async () => {
+      game.vgmusic.playlistTree = app;
+      setMockSetting('vgmusic', 'defaultMusic', { documentName: 'DefaultMusic', data: { vgmusic: { music: {} } } });
+      const soundboardPlaylist = createMockPlaylist('pl-sfx', 'SFX Soundboard', [{ id: 'tr-sfx-1', name: 'Roar' }]);
+      soundboardPlaylist.mode = -1; // UNSEQUENCED mode
+      game.playlists.push(soundboardPlaylist);
+      game.playlists.get = vi.fn((id) => (id === 'pl-sfx' ? soundboardPlaylist : null));
+
+      const target = {
+        value: 'pl-sfx',
+        dataset: { contextType: 'combat' },
+        closest: () => null
+      };
+
+      await PlaylistTreeApp.handleUpdateGlobalDefault(new Event('change'), target);
+
+      expect(game.settings.set).toHaveBeenCalledWith(
+        CONST.moduleId,
+        CONST.settings.defaultMusic,
+        expect.objectContaining({
+          data: expect.objectContaining({
+            vgmusic: expect.objectContaining({
+              music: expect.objectContaining({
+                combat: { playlist: 'pl-sfx', initialTrack: 'tr-sfx-1' }
+              })
+            })
+          })
+        })
+      );
+    });
   });
 
   describe('_onChangeInput', () => {
@@ -333,6 +364,38 @@ describe('PlaylistTreeApp', () => {
     it('defaults to collapsed when an item has no overrides, and expanded when it has overrides', () => {
       expect(app.isSectionCollapsed('key1', true)).toBe(false); // Expanded
       expect(app.isSectionCollapsed('key2', false)).toBe(true); // Collapsed
+    });
+  });
+
+  describe('_onRender event listener management', () => {
+    it('attaches change event listener only once even after multiple _onRender calls', () => {
+      const mockElement = {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      };
+      app.element = mockElement;
+
+      app._onRender({}, {});
+      app._onRender({}, {});
+      app._onRender({}, {});
+
+      expect(mockElement.addEventListener).toHaveBeenCalledTimes(1);
+      expect(mockElement.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    });
+
+    it('removes change event listener on _onClose and resets flag', () => {
+      const mockElement = {
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn()
+      };
+      app.element = mockElement;
+
+      app._onRender({}, {});
+      expect(app._changeListenerBound).toBe(true);
+
+      app._onClose({});
+      expect(mockElement.removeEventListener).toHaveBeenCalledWith('change', app._onChangeInputHandler);
+      expect(app._changeListenerBound).toBe(false);
     });
   });
 });

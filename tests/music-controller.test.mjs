@@ -430,47 +430,6 @@ describe('MusicController', () => {
     });
   });
 
-  describe('isManagedPlaylist', () => {
-    it('returns false for null/undefined playlist', () => {
-      expect(controller.isManagedPlaylist(null)).toBe(false);
-    });
-
-    it('returns true when playlist matches currentContext playlist', () => {
-      const playlist = createMockPlaylist('p1', 'Playlist 1', []);
-      controller.currentContext = { playlist };
-
-      expect(controller.isManagedPlaylist(playlist)).toBe(true);
-    });
-
-    it('returns true when playlist is configured in scene flags', () => {
-      const playlist = createMockPlaylist('p1', 'Scene Playlist', []);
-      const scene = {
-        getFlag: vi.fn((mod, key) => (key === 'music' ? { area: { playlist: 'p1' } } : null))
-      };
-      game.scenes = [scene];
-
-      expect(controller.isManagedPlaylist(playlist)).toBe(true);
-    });
-
-    it('returns true when playlist is configured in actor mood overrides', () => {
-      const playlist = createMockPlaylist('p1', 'Boss Playlist', []);
-      const actor = {
-        getFlag: vi.fn((mod, key) => (key === 'music' ? { combat: { moods: { boss: { playlist: 'p1' } } } } : null))
-      };
-      game.actors = [actor];
-
-      expect(controller.isManagedPlaylist(playlist)).toBe(true);
-    });
-
-    it('returns false when playlist is not managed by VGMusic', () => {
-      const playlist = createMockPlaylist('unmanaged', 'Unmanaged', []);
-      game.scenes = [];
-      game.actors = [];
-
-      expect(controller.isManagedPlaylist(playlist)).toBe(false);
-    });
-  });
-
   describe('6-tier hierarchy resolution', () => {
     let globalDefaultPl, globalMoodPl, sceneDefaultPl, sceneMoodPl, tokenDefaultPl, tokenMoodPl;
 
