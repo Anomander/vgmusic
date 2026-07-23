@@ -23,12 +23,12 @@ export const CONST = {
   silentModes: { highestPriority: 'highestPriority', lastActor: 'lastActor', area: 'area', generic: 'generic' },
   playlistSections: {
     DefaultMusic: {
-      area: { label: 'VGMusic.PlaylistSection.Area', priority: -25 },
-      combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -15 }
+      area: { label: 'VGMusic.PlaylistSection.Area', priority: -40 },
+      combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -35 }
     },
-    Scene: { area: { label: 'VGMusic.PlaylistSection.Area', priority: -20 }, combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -10 } },
+    Scene: { area: { label: 'VGMusic.PlaylistSection.Area', priority: -20 }, combat: { label: 'VGMusic.PlaylistSection.Combat', priority: -15 } },
     Actor: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: 0 } },
-    Token: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: 5 } }
+    Token: { combat: { label: 'VGMusic.PlaylistSection.Combat', priority: 20 } }
   },
   documentSortPriority: ['Token', 'Actor', 'Scene', 'DefaultMusic']
 };

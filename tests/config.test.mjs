@@ -28,7 +28,11 @@ describe('CONST', () => {
     expect(CONST.playlistSections.Actor).toBeDefined();
     expect(CONST.playlistSections.Token).toBeDefined();
 
-    expect(CONST.playlistSections.Scene.area.label).toBe('VGMusic.PlaylistSection.Area');
-    expect(CONST.playlistSections.Scene.combat.label).toBe('VGMusic.PlaylistSection.Combat');
+    expect(CONST.playlistSections.DefaultMusic.area.priority).toBe(-40);
+    expect(CONST.playlistSections.DefaultMusic.combat.priority).toBe(-35);
+    expect(CONST.playlistSections.Scene.area.priority).toBe(-20);
+    expect(CONST.playlistSections.Scene.combat.priority).toBe(-15);
+    expect(CONST.playlistSections.Actor.combat.priority).toBe(0);
+    expect(CONST.playlistSections.Token.combat.priority).toBe(20);
   });
 });

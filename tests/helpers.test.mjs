@@ -113,13 +113,13 @@ describe('helpers.mjs', () => {
   describe('PlaylistContext._extractSectionConfig', () => {
     it('returns null values for null/undefined section', () => {
       const config = PlaylistContext._extractSectionConfig(null, '');
-      expect(config).toEqual({ playlistId: null, trackId: null, priority: 0 });
+      expect(config).toEqual({ playlistId: null, trackId: null, priority: 0, isMood: false });
     });
 
     it('returns base section values when no mood is active', () => {
       const section = { playlist: 'pl1', initialTrack: 'tr1', priority: 5 };
       const config = PlaylistContext._extractSectionConfig(section, '');
-      expect(config).toEqual({ playlistId: 'pl1', trackId: 'tr1', priority: 5 });
+      expect(config).toEqual({ playlistId: 'pl1', trackId: 'tr1', priority: 5, isMood: false });
     });
 
     it('returns mood override values when active mood has a playlist', () => {
@@ -131,7 +131,7 @@ describe('helpers.mjs', () => {
         }
       };
       const config = PlaylistContext._extractSectionConfig(section, 'boss');
-      expect(config).toEqual({ playlistId: 'boss-pl', trackId: 'boss-tr', priority: 10 });
+      expect(config).toEqual({ playlistId: 'boss-pl', trackId: 'boss-tr', priority: 10, isMood: true });
     });
 
     it('falls back to base section when active mood has no playlist', () => {
@@ -144,9 +144,10 @@ describe('helpers.mjs', () => {
       };
       const config = PlaylistContext._extractSectionConfig(section, 'calm');
       expect(config.playlistId).toBe('base-pl');
+      expect(config.isMood).toBe(false);
     });
 
-    it('falls back to section priority when active mood has no priority specified', () => {
+    it('adds mood priority offset (+10) when active mood has a playlist but no explicit priority specified', () => {
       const section = {
         playlist: 'base-pl',
         priority: 7,
@@ -155,7 +156,8 @@ describe('helpers.mjs', () => {
         }
       };
       const config = PlaylistContext._extractSectionConfig(section, 'calm');
-      expect(config.priority).toBe(7);
+      expect(config.priority).toBe(17);
+      expect(config.isMood).toBe(true);
     });
   });
 

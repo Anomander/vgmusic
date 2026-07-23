@@ -4,7 +4,9 @@ import { setupFoundryMocks } from './mocks/foundry.mjs';
 setupFoundryMocks();
 
 import { MoodConfigApp } from '../scripts/mood-config.mjs';
+import { MoodWidget } from '../scripts/mood-widget.mjs';
 import { CONST } from '../scripts/config.mjs';
+import { setMockSetting } from './mocks/foundry.mjs';
 
 describe('MoodConfigApp', () => {
   beforeEach(() => {
@@ -92,6 +94,34 @@ describe('MoodConfigApp', () => {
 
       expect(mockApp.moods).toEqual(CONST.defaultMoods);
       expect(mockApp.render).toHaveBeenCalledWith(false);
+    });
+  });
+});
+
+describe('MoodWidget', () => {
+  beforeEach(() => {
+    setupFoundryMocks();
+  });
+
+  describe('handleSetMood', () => {
+    it('sets activeMood to selected moodId when different from current active mood', async () => {
+      setMockSetting('vgmusic', 'activeMood', '');
+      const event = { preventDefault: vi.fn() };
+      const target = { closest: vi.fn().mockReturnValue({ dataset: { moodId: 'boss' } }) };
+
+      await MoodWidget.handleSetMood(event, target);
+
+      expect(game.settings.set).toHaveBeenCalledWith(CONST.moduleId, CONST.settings.activeMood, 'boss');
+    });
+
+    it('toggles off activeMood to empty string when clicking currently active mood', async () => {
+      setMockSetting('vgmusic', 'activeMood', 'boss');
+      const event = { preventDefault: vi.fn() };
+      const target = { closest: vi.fn().mockReturnValue({ dataset: { moodId: 'boss' } }) };
+
+      await MoodWidget.handleSetMood(event, target);
+
+      expect(game.settings.set).toHaveBeenCalledWith(CONST.moduleId, CONST.settings.activeMood, '');
     });
   });
 });

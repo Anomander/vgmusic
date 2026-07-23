@@ -12,10 +12,6 @@
   </div>
 
   <div class="mood-widget-pills">
-    <button type="button" class="mood-pill {{#unless activeMood}}active{{/unless}}" data-action="setMood" data-mood-id="" data-tooltip="{{localize 'VGMusic.Default'}}">
-      <i class="fas fa-music"></i>
-      <span>{{localize "VGMusic.Default"}}</span>
-    </button>
     {{#each moods}}
     <button type="button" class="mood-pill {{#if this.isActive}}active{{/if}}" data-action="setMood" data-mood-id="{{this.id}}" data-tooltip="{{localize this.label}}" style="--mood-color: {{this.color}};">
       <i class="{{this.icon}}"></i>

@@ -427,4 +427,168 @@ describe('MusicController', () => {
       expect(controller.isManagedPlaylist(playlist)).toBe(false);
     });
   });
+
+  describe('6-tier hierarchy resolution', () => {
+    let globalDefaultPl, globalMoodPl, sceneDefaultPl, sceneMoodPl, tokenDefaultPl, tokenMoodPl;
+
+    beforeEach(() => {
+      globalDefaultPl = createMockPlaylist('g-def', 'Global Default', []);
+      globalMoodPl = createMockPlaylist('g-mood', 'Global Mood', []);
+      sceneDefaultPl = createMockPlaylist('s-def', 'Scene Default', []);
+      sceneMoodPl = createMockPlaylist('s-mood', 'Scene Mood', []);
+      tokenDefaultPl = createMockPlaylist('t-def', 'Token Default', []);
+      tokenMoodPl = createMockPlaylist('t-mood', 'Token Mood', []);
+
+      const playlistsMap = {
+        'g-def': globalDefaultPl,
+        'g-mood': globalMoodPl,
+        's-def': sceneDefaultPl,
+        's-mood': sceneMoodPl,
+        't-def': tokenDefaultPl,
+        't-mood': tokenMoodPl
+      };
+      game.playlists.get = vi.fn((id) => playlistsMap[id] || null);
+
+      setMockSetting('vgmusic', 'defaultMusic', {
+        documentName: 'DefaultMusic',
+        data: {
+          vgmusic: {
+            music: {
+              area: {
+                playlist: 'g-def',
+                priority: -40,
+                moods: { calm: { playlist: 'g-mood' } }
+              }
+            }
+          }
+        }
+      });
+    });
+
+    it('Level 1 vs Level 2: Global Mood beats Global Default when mood is active', () => {
+      setMockSetting('vgmusic', 'activeMood', 'calm');
+      game.scenes.active = null;
+
+      const contexts = controller.getAllCurrentPlaylists();
+      contexts.sort((a, b) => controller.sortPlaylists(a, b, null));
+
+      expect(contexts[0].playlist).toBe(globalMoodPl);
+      expect(contexts[0].priority).toBe(-30);
+    });
+
+    it('Level 2 vs Level 3: Scene Default beats Global Mood', () => {
+      setMockSetting('vgmusic', 'activeMood', 'calm');
+      const activeScene = new MockDocument({
+        name: 'Test Scene',
+        id: 'sc1',
+        getFlag: vi.fn((mod, key) => (key === 'music.area' ? { playlist: 's-def', priority: -20 } : null))
+      });
+      game.scenes.active = activeScene;
+
+      const contexts = controller.getAllCurrentPlaylists();
+      contexts.sort((a, b) => controller.sortPlaylists(a, b, null));
+
+      expect(contexts[0].playlist).toBe(sceneDefaultPl);
+      expect(contexts[0].priority).toBe(-20);
+    });
+
+    it('Level 3 vs Level 4: Scene Mood beats Scene Default and Global Mood', () => {
+      setMockSetting('vgmusic', 'activeMood', 'calm');
+      const activeScene = new MockDocument({
+        name: 'Test Scene',
+        id: 'sc1',
+        getFlag: vi.fn((mod, key) => {
+          if (key === 'music.area') {
+            return {
+              playlist: 's-def',
+              priority: -20,
+              moods: { calm: { playlist: 's-mood' } }
+            };
+          }
+          return null;
+        })
+      });
+      game.scenes.active = activeScene;
+
+      const contexts = controller.getAllCurrentPlaylists();
+      contexts.sort((a, b) => controller.sortPlaylists(a, b, null));
+
+      expect(contexts[0].playlist).toBe(sceneMoodPl);
+      expect(contexts[0].priority).toBe(-10);
+    });
+
+    it('Level 4 vs Level 5: Token Default beats Scene Mood', () => {
+      setMockSetting('vgmusic', 'activeMood', 'calm');
+      const activeScene = new MockDocument({
+        name: 'Test Scene',
+        id: 'sc1',
+        getFlag: vi.fn((mod, key) => {
+          if (key === 'music.area') {
+            return {
+              playlist: 's-def',
+              priority: -20,
+              moods: { calm: { playlist: 's-mood' } }
+            };
+          }
+          return null;
+        })
+      });
+      game.scenes.active = activeScene;
+
+      function PrototypeToken() {
+        this.flags = {
+          vgmusic: {
+            music: {
+              combat: { playlist: 't-def', priority: 20 }
+            }
+          }
+        };
+      }
+      const token = new PrototypeToken();
+      game.combats = {
+        active: {
+          started: true,
+          combatant: { token },
+          combatants: [{ token }]
+        }
+      };
+
+      const contexts = controller.getAllCurrentPlaylists();
+      contexts.sort((a, b) => controller.sortPlaylists(a, b, game.combats.active));
+
+      expect(contexts[0].playlist).toBe(tokenDefaultPl);
+      expect(contexts[0].priority).toBe(20);
+    });
+
+    it('Level 5 vs Level 6: Token Mood beats Token Default', () => {
+      setMockSetting('vgmusic', 'activeMood', 'calm');
+      function PrototypeToken() {
+        this.flags = {
+          vgmusic: {
+            music: {
+              combat: {
+                playlist: 't-def',
+                priority: 20,
+                moods: { calm: { playlist: 't-mood' } }
+              }
+            }
+          }
+        };
+      }
+      const token = new PrototypeToken();
+      game.combats = {
+        active: {
+          started: true,
+          combatant: { token },
+          combatants: [{ token }]
+        }
+      };
+
+      const contexts = controller.getAllCurrentPlaylists();
+      contexts.sort((a, b) => controller.sortPlaylists(a, b, game.combats.active));
+
+      expect(contexts[0].playlist).toBe(tokenMoodPl);
+      expect(contexts[0].priority).toBe(30);
+    });
+  });
 });

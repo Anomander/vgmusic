@@ -234,16 +234,15 @@ export class MoodWidget extends HandlebarsApplicationMixin(ApplicationV2) {
     } catch (e) { /* settings not available */ }
   }
 
-  /**
-   * Handle setting active mood from widget button
-   */
   static async handleSetMood(event, target) {
     event.preventDefault();
     const button = target.closest('[data-mood-id]') || target;
     const moodId = button.dataset?.moodId ?? '';
+    const currentActive = game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
+    const targetMood = moodId === currentActive ? '' : moodId;
     try {
-      await game.settings.set(CONST.moduleId, CONST.settings.activeMood, moodId);
-      log(3, `Active mood set to: '${moodId || 'Default'}'`);
+      await game.settings.set(CONST.moduleId, CONST.settings.activeMood, targetMood);
+      log(3, `Active mood set to: '${targetMood || 'none'}'`);
     } catch (error) {
       log(1, 'Error setting active mood:', error);
     }

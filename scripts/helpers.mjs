@@ -86,13 +86,14 @@ export class PlaylistContext {
    * @param {number} priority - Priority level for sorting
    * @param {Document|null} scopeEntity - Entity for progress tracking
    */
-  constructor(context, contextEntity, playlist, trackId, priority = 0, scopeEntity = null) {
+  constructor(context, contextEntity, playlist, trackId, priority = 0, scopeEntity = null, isMood = false) {
     this.context = context;
     this.contextEntity = contextEntity;
     this.playlist = playlist;
     this.trackId = trackId;
     this.priority = priority;
     this.scopeEntity = scopeEntity;
+    this.isMood = isMood;
     this._resolvedTracks = null;
   }
 
@@ -159,17 +160,23 @@ export class PlaylistContext {
    * Extract playlist context data from a music section config object
    * @param {object} section - The music section data (e.g., from flags or settings)
    * @param {string} activeMood - Current active mood ID
-   * @returns {{playlistId: string|null, trackId: string|null, priority: number}}
+   * @returns {{playlistId: string|null, trackId: string|null, priority: number, isMood: boolean}}
    * @private
    */
   static _extractSectionConfig(section, activeMood) {
-    if (!section) return { playlistId: null, trackId: null, priority: 0 };
+    if (!section) return { playlistId: null, trackId: null, priority: 0, isMood: false };
     const moodOverride = (activeMood && section.moods?.[activeMood]?.playlist) ? section.moods[activeMood] : null;
+    const isMood = !!moodOverride;
     const config = moodOverride || section;
+    const defaultPriority = section.priority ?? 0;
+    const moodOffset = isMood ? 10 : 0;
+    const basePriority = defaultPriority + moodOffset;
+    const priority = config.priority ?? basePriority;
     return {
       playlistId: config.playlist || null,
       trackId: config.initialTrack || null,
-      priority: config.priority ?? section.priority ?? 0
+      priority,
+      isMood
     };
   }
 
@@ -202,7 +209,7 @@ export class PlaylistContext {
       return null;
     }
 
-    const { playlistId, trackId, priority } = this._extractSectionConfig(section, activeMood);
+    const { playlistId, trackId, priority, isMood } = this._extractSectionConfig(section, activeMood);
     const playlist = playlistId ? game.playlists.get(playlistId) : null;
 
     if (!playlist) {
@@ -210,7 +217,7 @@ export class PlaylistContext {
       return null;
     }
 
-    return new this(type, document, playlist, trackId, priority, scopeEntity);
+    return new this(type, document, playlist, trackId, priority, scopeEntity, isMood);
   }
 }
 

@@ -88,7 +88,7 @@ export class MusicController {
       const targetTracks = winnerContext?.tracks || [];
       const primaryTrackName = targetTracks[0]?.name || 'none';
 
-      log(3, `Resolved current playlist context: ${winnerContext?.context || 'none'} - '${winnerContext?.playlist?.name || 'none'}' (${targetTracks.length} tracks, primary: '${primaryTrackName}')`);
+      log(3, `Resolved current playlist context: ${winnerContext?.context || 'none'} (moodOverride: ${winnerContext?.isMood ?? false}) - '${winnerContext?.playlist?.name || 'none'}' (${targetTracks.length} tracks, primary: '${primaryTrackName}')`);
 
       if (
         this.currentContext?.playlist?.id === winnerContext?.playlist?.id &&
