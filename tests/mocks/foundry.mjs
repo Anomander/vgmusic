@@ -69,11 +69,12 @@ class MockDragDrop {
 
 export function setupFoundryMocks(overrides = {}) {
   const settings = createMockSettings();
+  const gmUser = { id: 'gm1', isGM: true, active: true };
 
   globalThis.game = {
     settings,
-    user: { id: 'gm1', isGM: true },
-    users: Object.assign([{ id: 'gm1', isGM: true, active: true }], {
+    user: gmUser,
+    users: Object.assign([gmUser], {
       filter: function (fn) {
         return Array.prototype.filter.call(this, fn);
       }
@@ -85,6 +86,14 @@ export function setupFoundryMocks(overrides = {}) {
     vgmusic: { musicController: null, moodWidget: null },
     i18n: { localize: vi.fn((key) => key) },
     ...overrides
+  };
+
+  globalThis.ui = {
+    notifications: {
+      error: vi.fn(),
+      warn: vi.fn(),
+      info: vi.fn()
+    }
   };
 
   globalThis.foundry = {

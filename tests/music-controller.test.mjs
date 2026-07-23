@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setupFoundryMocks, setMockSetting, createMockSound, createMockPlaylist } from './mocks/foundry.mjs';
+import { setupFoundryMocks, setMockSetting, createMockSound, createMockPlaylist, MockDocument } from './mocks/foundry.mjs';
 
 setupFoundryMocks();
 
@@ -229,6 +229,202 @@ describe('MusicController', () => {
 
       expect(controller.getPlaylistData(firstEntity, sound)).toBe(0);
       expect(controller.getPlaylistData(lastEntity, sound)).toBe(10);
+    });
+  });
+
+  describe('playCurrentTrack', () => {
+    it('returns early when isDebouncing is true', async () => {
+      controller.isDebouncing = true;
+      const spy = vi.spyOn(controller, 'getAllCurrentPlaylists');
+      await controller.playCurrentTrack();
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('returns early when current user is not head GM', async () => {
+      const gm1 = { id: 'gm1', isGM: true, active: true };
+      const gm2 = { id: 'gm2', isGM: true, active: true };
+      game.users = [gm1, gm2];
+      game.user = gm2;
+
+      const spy = vi.spyOn(controller, 'getAllCurrentPlaylists');
+      await controller.playCurrentTrack();
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('registers unlock listener when game audio is locked', async () => {
+      game.audio = { locked: true };
+      await controller.playCurrentTrack();
+
+      expect(controller._audioUnlockRegistered).toBe(true);
+      expect(globalThis.document.addEventListener).toHaveBeenCalledWith('pointerdown', expect.any(Function), { once: true });
+      expect(globalThis.document.addEventListener).toHaveBeenCalledWith('keydown', expect.any(Function), { once: true });
+    });
+
+    it('does not re-register unlock listener if already registered', async () => {
+      game.audio = { locked: true };
+      controller._audioUnlockRegistered = true;
+      globalThis.document.addEventListener.mockClear();
+
+      await controller.playCurrentTrack();
+      expect(globalThis.document.addEventListener).not.toHaveBeenCalled();
+    });
+
+    it('executes context resolution and calls transitionToContext', async () => {
+      vi.useFakeTimers();
+      const sound1 = createMockSound('s1', 'Sound 1');
+      const playlist = createMockPlaylist('p1', 'Playlist 1', [sound1]);
+      const targetCtx = { playlist, tracks: [sound1], context: 'area' };
+
+      vi.spyOn(controller, 'getAllCurrentPlaylists').mockReturnValue([targetCtx]);
+      vi.spyOn(controller, 'filterPlaylists').mockReturnValue(true);
+      const transitionSpy = vi.spyOn(controller, 'transitionToContext').mockResolvedValue();
+
+      await controller.playCurrentTrack();
+
+      expect(transitionSpy).toHaveBeenCalledWith(targetCtx);
+      vi.advanceTimersByTime(350);
+      expect(controller.isDebouncing).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it('skips transition if current tracks already match resolved target context', async () => {
+      const sound1 = createMockSound('s1', 'Sound 1');
+      const playlist = createMockPlaylist('p1', 'Playlist 1', [sound1]);
+      const targetCtx = { playlist, tracks: [sound1], context: 'area' };
+
+      controller.currentContext = { playlist };
+      controller.currentTracks = [sound1];
+
+      vi.spyOn(controller, 'getAllCurrentPlaylists').mockReturnValue([targetCtx]);
+      vi.spyOn(controller, 'filterPlaylists').mockReturnValue(true);
+      const transitionSpy = vi.spyOn(controller, 'transitionToContext').mockResolvedValue();
+
+      await controller.playCurrentTrack();
+      expect(transitionSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('transitionToContext', () => {
+    it('fades out playing active tracks not in target context and starts new tracks', async () => {
+      setMockSetting('vgmusic', 'fadeDuration', 2); // 2 seconds
+
+      const playingSound = createMockSound('old1', 'Old Track', { playing: true });
+      const playingPlaylist = createMockPlaylist('oldP', 'Old Playlist', [playingSound]);
+      game.playlists.playing = [playingPlaylist];
+
+      const newSound = createMockSound('new1', 'New Track');
+      const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
+      const targetCtx = { playlist: newPlaylist, tracks: [newSound], scopeEntity: null };
+
+      const playTrackSpy = vi.spyOn(controller, 'playTrack').mockResolvedValue();
+      const stopTrackSpy = vi.spyOn(controller, 'stopTrack');
+
+      await controller.transitionToContext(targetCtx);
+
+      expect(playingSound.sound.fade).toHaveBeenCalledWith(0, { duration: 2000 });
+      expect(controller.currentContext).toBe(targetCtx);
+      expect(controller.currentTracks).toEqual([newSound]);
+      expect(playTrackSpy).toHaveBeenCalledWith(newSound);
+    });
+
+    it('immediately stops playing tracks when fadeDuration is 0', async () => {
+      setMockSetting('vgmusic', 'fadeDuration', 0);
+
+      const playingSound = createMockSound('old1', 'Old Track', { playing: true });
+      const playingPlaylist = createMockPlaylist('oldP', 'Old Playlist', [playingSound]);
+      game.playlists.playing = [playingPlaylist];
+
+      const newSound = createMockSound('new1', 'New Track');
+      const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
+      const targetCtx = { playlist: newPlaylist, tracks: [newSound], scopeEntity: null };
+
+      const stopTrackSpy = vi.spyOn(controller, 'stopTrack');
+      await controller.transitionToContext(targetCtx);
+
+      expect(stopTrackSpy).toHaveBeenCalledWith(playingSound);
+    });
+  });
+
+  describe('getAllCurrentPlaylists', () => {
+    it('returns empty array when no scene, combat, or default music configured', () => {
+      game.scenes.active = null;
+      game.combats.active = null;
+      expect(controller.getAllCurrentPlaylists()).toEqual([]);
+    });
+
+    it('collects scene area and combat contexts when active scene exists', () => {
+      const areaPlaylist = createMockPlaylist('p1', 'Area Playlist', []);
+      const combatPlaylist = createMockPlaylist('p2', 'Combat Playlist', []);
+      game.playlists.get = vi.fn((id) => (id === 'p1' ? areaPlaylist : id === 'p2' ? combatPlaylist : null));
+
+      const activeScene = new MockDocument({
+        name: 'Scene 1',
+        id: 'scene1',
+        getFlag: vi.fn((mod, key) => {
+          if (key === 'music.area') return { playlist: 'p1' };
+          if (key === 'music.combat') return { playlist: 'p2' };
+          return null;
+        })
+      });
+      game.scenes.active = activeScene;
+
+      const contexts = controller.getAllCurrentPlaylists();
+      expect(contexts.map((c) => c.playlist)).toContain(areaPlaylist);
+      expect(contexts.map((c) => c.playlist)).toContain(combatPlaylist);
+    });
+
+    it('collects default music context when configured', () => {
+      const defaultPlaylist = createMockPlaylist('defP', 'Default Area', []);
+      game.playlists.get = vi.fn((id) => (id === 'defP' ? defaultPlaylist : null));
+
+      setMockSetting('vgmusic', 'defaultMusic', {
+        documentName: 'DefaultMusic',
+        data: { vgmusic: { music: { area: { playlist: 'defP' } } } }
+      });
+
+      const contexts = controller.getAllCurrentPlaylists();
+      expect(contexts.map((c) => c.playlist)).toContain(defaultPlaylist);
+    });
+  });
+
+  describe('isManagedPlaylist', () => {
+    it('returns false for null/undefined playlist', () => {
+      expect(controller.isManagedPlaylist(null)).toBe(false);
+    });
+
+    it('returns true when playlist matches currentContext playlist', () => {
+      const playlist = createMockPlaylist('p1', 'Playlist 1', []);
+      controller.currentContext = { playlist };
+
+      expect(controller.isManagedPlaylist(playlist)).toBe(true);
+    });
+
+    it('returns true when playlist is configured in scene flags', () => {
+      const playlist = createMockPlaylist('p1', 'Scene Playlist', []);
+      const scene = {
+        getFlag: vi.fn((mod, key) => (key === 'music' ? { area: { playlist: 'p1' } } : null))
+      };
+      game.scenes = [scene];
+
+      expect(controller.isManagedPlaylist(playlist)).toBe(true);
+    });
+
+    it('returns true when playlist is configured in actor mood overrides', () => {
+      const playlist = createMockPlaylist('p1', 'Boss Playlist', []);
+      const actor = {
+        getFlag: vi.fn((mod, key) => (key === 'music' ? { combat: { moods: { boss: { playlist: 'p1' } } } } : null))
+      };
+      game.actors = [actor];
+
+      expect(controller.isManagedPlaylist(playlist)).toBe(true);
+    });
+
+    it('returns false when playlist is not managed by VGMusic', () => {
+      const playlist = createMockPlaylist('unmanaged', 'Unmanaged', []);
+      game.scenes = [];
+      game.actors = [];
+
+      expect(controller.isManagedPlaylist(playlist)).toBe(false);
     });
   });
 });

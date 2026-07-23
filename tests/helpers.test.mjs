@@ -145,6 +145,18 @@ describe('helpers.mjs', () => {
       const config = PlaylistContext._extractSectionConfig(section, 'calm');
       expect(config.playlistId).toBe('base-pl');
     });
+
+    it('falls back to section priority when active mood has no priority specified', () => {
+      const section = {
+        playlist: 'base-pl',
+        priority: 7,
+        moods: {
+          calm: { playlist: 'calm-pl' }
+        }
+      };
+      const config = PlaylistContext._extractSectionConfig(section, 'calm');
+      expect(config.priority).toBe(7);
+    });
   });
 
   describe('PlaylistContext._resolveTracks', () => {
@@ -225,6 +237,36 @@ describe('helpers.mjs', () => {
       expect(ctx.priority).toBe(5);
     });
 
+    it('creates context from PrototypeToken', () => {
+      const playlist = createMockPlaylist('pl1', 'Playlist 1', []);
+      game.playlists.get = vi.fn((id) => (id === 'pl1' ? playlist : null));
+
+      function PrototypeToken() {
+        this.flags = { vgmusic: { music: { combat: { playlist: 'pl1', priority: 3 } } } };
+      }
+      const protoToken = new PrototypeToken();
+
+      const ctx = PlaylistContext.fromDocument(protoToken, 'combat', protoToken);
+      expect(ctx).not.toBeNull();
+      expect(ctx.playlist).toBe(playlist);
+      expect(ctx.priority).toBe(3);
+    });
+
+    it('creates context from DefaultMusic configuration object', () => {
+      const playlist = createMockPlaylist('pl1', 'Playlist 1', []);
+      game.playlists.get = vi.fn((id) => (id === 'pl1' ? playlist : null));
+
+      const defaultDoc = {
+        documentName: 'DefaultMusic',
+        data: { vgmusic: { music: { area: { playlist: 'pl1', priority: -25 } } } }
+      };
+
+      const ctx = PlaylistContext.fromDocument(defaultDoc, 'area', null);
+      expect(ctx).not.toBeNull();
+      expect(ctx.playlist).toBe(playlist);
+      expect(ctx.priority).toBe(-25);
+    });
+
     it('returns null when resolved playlist does not exist', () => {
       game.playlists.get = vi.fn(() => null);
       const doc = new MockDocument({
@@ -252,6 +294,21 @@ describe('helpers.mjs', () => {
 
       vi.useRealTimers();
     });
+
+    it('triggers playCurrentTrack when deleted track matches currentTrack', () => {
+      vi.useFakeTimers();
+      const mockTrack = createMockSound('tr1', 'Track 1');
+      const controller = { fadingTracks: [], currentTrack: mockTrack, playCurrentTrack: vi.fn() };
+      game.vgmusic = { musicController: controller };
+
+      const fading = new FadingTrack(mockTrack, 100);
+      controller.fadingTracks.push(fading);
+
+      vi.advanceTimersByTime(115);
+      expect(controller.playCurrentTrack).toHaveBeenCalledTimes(1);
+
+      vi.useRealTimers();
+    });
   });
 
   describe('log', () => {
@@ -259,6 +316,25 @@ describe('helpers.mjs', () => {
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
       log(1, 'Test error');
       expect(spy).toHaveBeenCalledWith('VGMusic |', 'Test error');
+      spy.mockRestore();
+    });
+
+    it('logs level 2 warnings to console.warn when enableDebug is true', () => {
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      setMockSetting('vgmusic', 'enableDebug', true);
+      log(2, 'Test warning');
+      expect(spy).toHaveBeenCalledWith('VGMusic |', 'Test warning');
+      spy.mockRestore();
+    });
+
+    it('gracefully handles settings.get throwing error before initialization', () => {
+      const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      game.settings.get.mockImplementationOnce(() => {
+        throw new Error('Settings not initialized');
+      });
+
+      expect(() => log(3, 'Test msg')).not.toThrow();
+      expect(spy).toHaveBeenCalledWith('VGMusic |', 'Test msg');
       spy.mockRestore();
     });
 

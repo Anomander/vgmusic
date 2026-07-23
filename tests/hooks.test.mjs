@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setupFoundryMocks } from './mocks/foundry.mjs';
+import { setupFoundryMocks, setMockSetting } from './mocks/foundry.mjs';
 
 setupFoundryMocks();
 
@@ -12,9 +12,12 @@ import {
   handleUpdateScene,
   handleUpdateActor,
   handleUpdateToken,
-  handleReady
+  handleReady,
+  getSceneControlButtons,
+  handleTokenConfigRender
 } from '../scripts/hooks.mjs';
 import { CONST } from '../scripts/config.mjs';
+import { MoodWidget } from '../scripts/mood-widget.mjs';
 
 describe('hooks.mjs', () => {
   let mockController;
@@ -155,6 +158,46 @@ describe('hooks.mjs', () => {
     });
   });
 
+  describe('getSceneControlButtons', () => {
+    it('populates music suppression tools into controls.sounds.tools', () => {
+      const controls = {
+        sounds: {
+          tools: {}
+        }
+      };
+
+      getSceneControlButtons(controls);
+
+      expect(controls.sounds.tools['suppress-area-music']).toBeDefined();
+      expect(controls.sounds.tools['suppress-combat-music']).toBeDefined();
+      expect(controls.sounds.tools['mood-widget']).toBeDefined();
+    });
+
+    it('gracefully handles missing sounds tools object', () => {
+      expect(() => getSceneControlButtons({})).not.toThrow();
+    });
+  });
+
+  describe('handleTokenConfigRender', () => {
+    it('returns early when current user is not GM', () => {
+      game.user = { isGM: false };
+      const app = {};
+      const html = { querySelector: vi.fn() };
+
+      handleTokenConfigRender(app, html);
+      expect(html.querySelector).not.toHaveBeenCalled();
+    });
+
+    it('returns early when identity tab is not found', () => {
+      game.user = { isGM: true };
+      const app = {};
+      const html = { querySelector: vi.fn().mockReturnValue(null) };
+
+      handleTokenConfigRender(app, html);
+      expect(html.querySelector).toHaveBeenCalledWith('[data-application-part="identity"]');
+    });
+  });
+
   describe('handleReady', () => {
     it('calls playCurrentTrack after delay', () => {
       vi.useFakeTimers();
@@ -163,6 +206,17 @@ describe('hooks.mjs', () => {
       vi.advanceTimersByTime(1050);
       expect(mockController.playCurrentTrack).toHaveBeenCalledTimes(1);
       vi.useRealTimers();
+    });
+
+    it('restores mood widget open state when isOpen is true in position settings', () => {
+      const openSpy = vi.spyOn(MoodWidget, 'open').mockImplementation(() => {});
+
+      setMockSetting('vgmusic', 'moodWidgetPosition', { isOpen: true });
+
+      handleReady();
+
+      expect(openSpy).toHaveBeenCalledTimes(1);
+      openSpy.mockRestore();
     });
   });
 });
