@@ -5,6 +5,26 @@ import { CONST } from './config.mjs';
  */
 
 /**
+ * Canonicalize text into a slug ID (lowercased, non-alpha replaced with dashes)
+ * @param {string} text - Source text
+ * @returns {string} Canonicalized ID
+ */
+export function canonicalizeId(text) {
+  if (!text) return '';
+  let str = text;
+  if (str.startsWith('VGMusic.Mood.')) {
+    str = str.replace('VGMusic.Mood.', '');
+  } else if (str.startsWith('VGMusic.')) {
+    str = str.replace('VGMusic.', '');
+  }
+  return str
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
  * Get the first available GM user
  * @returns {object|null} First active GM user
  */
@@ -39,6 +59,19 @@ export function getProperty(object, path) {
  */
 export function setProperty(object, path, value) {
   return foundry.utils.setProperty(object, path, value);
+}
+
+/**
+ * Identify the VGMusic document category for a given entity
+ * @param {Document|object} doc - The document to identify
+ * @returns {'Document'|'PrototypeToken'|'DefaultMusic'|null}
+ */
+export function getDocumentCategory(doc) {
+  if (!doc) return null;
+  if (doc instanceof foundry.abstract.Document) return 'Document';
+  if (doc.constructor?.name === 'PrototypeToken') return 'PrototypeToken';
+  if (doc.documentName === 'DefaultMusic') return 'DefaultMusic';
+  return null;
 }
 
 /**
@@ -87,7 +120,7 @@ export class PlaylistContext {
     }
 
     const mode = this.playlist.mode;
-    const modes = CONST.PLAYLIST_MODES || { UNSEQUENCED: -1, SEQUENTIAL: 0, SHUFFLE: 1, SIMULTANEOUS: 2 };
+    const modes = globalThis.CONST?.PLAYLIST_MODES ?? { UNSEQUENCED: -1, SEQUENTIAL: 0, SHUFFLE: 1, SIMULTANEOUS: 2 };
 
     if (mode === modes.SIMULTANEOUS) {
       return Array.from(this.playlist.sounds.values());
@@ -96,6 +129,10 @@ export class PlaylistContext {
     if (mode === modes.SHUFFLE) {
       const order = this.playlist.playbackOrder || Array.from(this.playlist.sounds.keys());
       if (order.length === 0) return [];
+      // Use the currently playing track from this playlist if one exists,
+      // rather than picking a new random track each evaluation
+      const currentlyPlaying = this.playlist.sounds.find((s) => s.playing);
+      if (currentlyPlaying) return [currentlyPlaying];
       const randomIndex = Math.floor(Math.random() * order.length);
       const track = this.playlist.sounds.get(order[randomIndex]);
       return track ? [track] : [];
@@ -119,6 +156,24 @@ export class PlaylistContext {
   }
 
   /**
+   * Extract playlist context data from a music section config object
+   * @param {object} section - The music section data (e.g., from flags or settings)
+   * @param {string} activeMood - Current active mood ID
+   * @returns {{playlistId: string|null, trackId: string|null, priority: number}}
+   * @private
+   */
+  static _extractSectionConfig(section, activeMood) {
+    if (!section) return { playlistId: null, trackId: null, priority: 0 };
+    const moodOverride = (activeMood && section.moods?.[activeMood]?.playlist) ? section.moods[activeMood] : null;
+    const config = moodOverride || section;
+    return {
+      playlistId: config.playlist || null,
+      trackId: config.initialTrack || null,
+      priority: config.priority ?? section.priority ?? 0
+    };
+  }
+
+  /**
    * Create playlist context from document
    * @param {Document|object} document - Source document or data model
    * @param {string} type - Music type ('area' or 'combat')
@@ -130,51 +185,32 @@ export class PlaylistContext {
       log(3, `PlaylistContext.fromDocument: Document is null or undefined for type '${type}'`);
       return null;
     }
-    if (document instanceof foundry.abstract.Document) {
-      const playlistId = document.getFlag(CONST.moduleId, `music.${type}.playlist`);
-      const playlist = playlistId ? game.playlists.get(playlistId) : null;
-      if (!playlist) {
-        log(3, `PlaylistContext.fromDocument: No playlist override found on document '${document.name || document.id}' (type: '${type}')`);
-        return null;
-      }
-      const trackId = document.getFlag(CONST.moduleId, `music.${type}.initialTrack`) || null;
-      const priority = document.getFlag(CONST.moduleId, `music.${type}.priority`) ?? 0;
-      return new this(type, document, playlist, trackId, priority, scopeEntity);
+    const activeMood = game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
+    const docName = document.name || document.id || document?.constructor?.name;
+
+    // Determine the music section based on document category
+    let section;
+    const category = getDocumentCategory(document);
+    if (category === 'Document') {
+      section = document.getFlag(CONST.moduleId, `music.${type}`) || {};
+    } else if (category === 'PrototypeToken') {
+      section = document.flags?.[CONST.moduleId]?.music?.[type];
+    } else if (category === 'DefaultMusic') {
+      section = document.data?.vgmusic?.music?.[type];
+    } else {
+      log(3, `PlaylistContext.fromDocument: Document of type '${document?.constructor?.name || typeof document}' is not supported (type: '${type}')`);
+      return null;
     }
-    if (document?.constructor?.name === 'PrototypeToken') {
-      const section = document.flags?.[CONST.moduleId]?.music?.[type];
-      if (!section) {
-        log(3, `PlaylistContext.fromDocument: No music section flags found on PrototypeToken '${document.name || document.id}' (type: '${type}')`);
-        return null;
-      }
-      const playlistId = section.playlist;
-      const playlist = playlistId ? game.playlists.get(playlistId) : null;
-      if (!playlist) {
-        log(3, `PlaylistContext.fromDocument: Playlist with ID '${playlistId}' not found for PrototypeToken '${document.name || document.id}' (type: '${type}')`);
-        return null;
-      }
-      const trackId = section.initialTrack || null;
-      const priority = section.priority ?? 0;
-      return new this(type, document, playlist, trackId, priority, scopeEntity);
+
+    const { playlistId, trackId, priority } = this._extractSectionConfig(section, activeMood);
+    const playlist = playlistId ? game.playlists.get(playlistId) : null;
+
+    if (!playlist) {
+      log(3, `PlaylistContext.fromDocument: No playlist override found on document '${docName}' (type: '${type}', mood: '${activeMood || 'default'}')`);
+      return null;
     }
-    if (document?.documentName === 'DefaultMusic') {
-      const section = document.data?.vgmusic?.music?.[type];
-      if (!section) {
-        log(3, `PlaylistContext.fromDocument: No music section found on DefaultMusic (type: '${type}')`);
-        return null;
-      }
-      const playlistId = section.playlist;
-      const playlist = playlistId ? game.playlists.get(playlistId) : null;
-      if (!playlist) {
-        log(3, `PlaylistContext.fromDocument: Playlist with ID '${playlistId}' not found for DefaultMusic (type: '${type}')`);
-        return null;
-      }
-      const trackId = section.initialTrack || null;
-      const priority = section.priority ?? 0;
-      return new this(type, document, playlist, trackId, priority, scopeEntity);
-    }
-    log(3, `PlaylistContext.fromDocument: Document of type '${document?.constructor?.name || typeof document}' is not supported (type: '${type}')`);
-    return null;
+
+    return new this(type, document, playlist, trackId, priority, scopeEntity);
   }
 }
 
@@ -234,4 +270,3 @@ export function log(level, ...args) {
       break;
   }
 }
-

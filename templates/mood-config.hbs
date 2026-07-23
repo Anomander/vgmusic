@@ -1,0 +1,43 @@
+<div class="vgmusic-mood-config-container">
+  <p class="hint" style="margin-bottom: 12px; color: var(--color-text-dark, #aaa);">{{localize "VGMusic.MoodConfig.Hint"}}</p>
+
+  <div class="mood-list">
+    {{#each moods}}
+    <div class="mood-item form-group" data-index="{{@index}}">
+      <div class="mood-drag-handle">
+        <i class="fas fa-grip-vertical"></i>
+      </div>
+      <input type="text" name="moods.{{@index}}.label" value="{{this.displayLabel}}" placeholder="Mood Name" class="mood-label-input" required />
+      
+      <select name="moods.{{@index}}.icon" class="mood-icon-select">
+        {{#each this.iconOptions}}
+        <option value="{{this.value}}" {{#if this.selected}}selected{{/if}}>{{this.label}}</option>
+        {{/each}}
+      </select>
+
+      <input type="color" name="moods.{{@index}}.color" value="{{this.color}}" class="mood-color-input" />
+      
+      <button type="button" class="mood-delete-btn" data-action="deleteMood" data-index="{{@index}}" title="{{localize 'VGMusic.UI.Delete'}}">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+    {{/each}}
+  </div>
+
+  <div class="form-group mood-actions" style="margin-top: 12px; display: flex; gap: 8px;">
+    <button type="button" data-action="addMood">
+      <i class="fas fa-plus"></i> {{localize "VGMusic.MoodConfig.AddMood"}}
+    </button>
+    <button type="button" data-action="resetDefaults">
+      <i class="fas fa-undo"></i> {{localize "VGMusic.UI.Reset"}}
+    </button>
+  </div>
+
+  <footer class="sheet-footer flexrow" style="margin-top: 15px; display: flex; gap: 8px;">
+    {{#each buttons}}
+    <button type="{{this.type}}" {{#if this.action}}data-action="{{this.action}}"{{/if}}>
+      <i class="{{this.icon}}"></i> {{localize this.label}}
+    </button>
+    {{/each}}
+  </footer>
+</div>

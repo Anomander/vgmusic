@@ -30,5 +30,22 @@
   "VGMusic.UI.Save": "Salvar",
   "VGMusic.UseTokenMusic.Hint": "Substitua a música de combate do ator com a configuração deste token.",
   "VGMusic.UseTokenMusic.Label": "Usar Música do Token",
-  "VGMusic.ErrorSoundboardTrackRequired": "Para playlists do tipo Soundboard, a seleção de uma faixa específica é obrigatória."
+  "VGMusic.ErrorSoundboardTrackRequired": "Para playlists do tipo Soundboard, a seleção de uma faixa específica é obrigatória.",
+  "VGMusic.MoodWidget.Title": "Widget de Humor",
+  "VGMusic.MoodWidget.Dock": "Fixar Widget",
+  "VGMusic.MoodWidget.Undock": "Soltar Janela",
+  "VGMusic.Keybindings.ToggleMoodWidget": "Alternar Widget de Humor",
+  "VGMusic.Settings.MoodConfig.Name": "Configurar Humores",
+  "VGMusic.Settings.MoodConfig.Label": "Configurar Humores do Mundo",
+  "VGMusic.Settings.MoodConfig.Hint": "Gerencie humores de música personalizados disponíveis para cenas, tokens e atores.",
+  "VGMusic.MoodConfig.Title": "Configuração de Humores",
+  "VGMusic.MoodConfig.AddMood": "Adicionar Humor",
+  "VGMusic.Mood.Calm": "Calmo",
+  "VGMusic.Mood.Tense": "Tenso",
+  "VGMusic.Mood.Boss": "Chefe",
+  "VGMusic.Mood.Stealth": "Furtivo",
+  "VGMusic.Mood.Victory": "Vitória",
+  "VGMusic.MoodOverride": "Sobrescrita de Humor",
+  "VGMusic.MoodHasOverride": "Possui Sobrescrita de Humor",
+  "VGMusic.UI.Delete": "Excluir"
 }

@@ -1,6 +1,9 @@
 import { registerSettings, registerKeybindings } from './settings.mjs';
 import { MusicController } from './music-controller.mjs';
+import { MoodWidget } from './mood-widget.mjs';
+import { MoodConfigApp } from './mood-config.mjs';
 import { log } from './helpers.mjs';
+import { VGMusicConfig } from './app.mjs';
 import {
   getSceneControlButtons,
   handleCanvasReady,
@@ -13,16 +16,26 @@ import {
   handleUpdateActor,
   handleUpdateCombat,
   handleUpdateScene,
-  handleUpdateToken,
-  VGMusicConfig
-} from './app.mjs';
+  handleUpdateToken
+} from './hooks.mjs';
 
 Hooks.once('init', async () => {
   log(3, 'Initializing Video Game Music module');
-  game.vgmusic = { musicController: new MusicController(), VGMusicConfig: VGMusicConfig };
+  game.vgmusic = {
+    musicController: new MusicController(),
+    VGMusicConfig,
+    MoodWidget,
+    MoodConfigApp,
+    moodWidget: null
+  };
   registerSettings();
   registerKeybindings();
-  await loadTemplates(['modules/vgmusic/templates/music-config.hbs']);
+
+  await loadTemplates([
+    'modules/vgmusic/templates/music-config.hbs',
+    'modules/vgmusic/templates/mood-widget.hbs',
+    'modules/vgmusic/templates/mood-config.hbs'
+  ]);
 });
 Hooks.once('ready', handleReady);
 Hooks.on('getSceneControlButtons', getSceneControlButtons);

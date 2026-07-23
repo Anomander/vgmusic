@@ -1,12 +1,30 @@
 <div class="flexcol standard-form vgmusic-config">
   <input type="hidden" name="documentType" value="{{documentType}}">
+
+  <nav class="sheet-tabs tabs mood-tabs" style="margin-bottom: 10px; display: flex; gap: 4px; border-bottom: 1px solid var(--color-border-subtle, #7a7971); padding-bottom: 4px; flex-wrap: wrap;">
+    <a class="item {{#unless selectedMood}}active{{/unless}}" data-action="selectMood" data-mood="" style="padding: 4px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+      <i class="fas fa-music"></i> {{localize "VGMusic.Default"}}
+    </a>
+    {{#each availableMoods}}
+    <a class="item {{#if this.isActive}}active{{/if}}" data-action="selectMood" data-mood="{{this.id}}" style="padding: 4px 8px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; gap: 4px; --mood-color: {{this.color}};">
+      <i class="{{this.icon}}"></i> {{localize this.label}}
+      {{#if this.hasOverride}}<span class="override-indicator" style="color: {{this.color}}; font-weight: bold; margin-left: 2px;">●</span>{{/if}}
+    </a>
+    {{/each}}
+  </nav>
+
   {{#each playlistConfig as |section|}}
     <fieldset>
-      <legend>{{section.labelLocalized}}</legend>
+      <legend>
+        {{section.labelLocalized}}
+        {{#if ../selectedMood}}
+          <span class="mood-subtitle" style="font-size: 0.85em; opacity: 0.8; font-weight: normal;">({{localize "VGMusic.MoodOverride"}})</span>
+        {{/if}}
+      </legend>
       <div class="standard-form playlist-section" data-section="{{section.id}}" data-item-id="{{section.playlist.id}}">
         {{#if section.playlist}}
           <div class="form-group">
-            <label>{{localize "VGMusic.PlaylistSection.Combat"}}</label>
+            <label>{{section.labelLocalized}}</label>
             <div class="form-fields playlist-info">
               <i class="fas fa-music"></i>
               <span class="playlist-name">{{section.playlist.name}}</span>
@@ -21,17 +39,26 @@
           <div class="form-group">
             <label>{{localize "VGMusic.InitialTrack"}}</label>
             <div class="form-fields">
+              {{#if ../selectedMood}}
+              <select name="music.{{section.id}}.moods.{{../selectedMood}}.initialTrack">
+                {{{selectOptions section.tracks selected=section.data.initialTrack blank=""}}}
+              </select>
+              {{else}}
               <select name="music.{{section.id}}.initialTrack">
                 {{{selectOptions section.tracks selected=section.data.initialTrack blank=""}}}
               </select>
+              {{/if}}
             </div>
           </div>
           {{#if section.allowPriority}}
             <div class="form-group">
               <label>{{localize "VGMusic.Priority"}}</label>
               <div class="form-fields">
-                <input type="number" name="music.{{section.id}}.priority" value="{{section.data.priority}}"
-                  placeholder="0">
+                {{#if ../selectedMood}}
+                <input type="number" name="music.{{section.id}}.moods.{{../selectedMood}}.priority" value="{{section.data.priority}}" placeholder="0">
+                {{else}}
+                <input type="number" name="music.{{section.id}}.priority" value="{{section.data.priority}}" placeholder="0">
+                {{/if}}
               </div>
             </div>
           {{/if}}
@@ -45,7 +72,7 @@
       </div>
     </fieldset>
   {{/each}}
-  <footer class="flexrow">
+  <footer class="flexrow" style="margin-top: 10px;">
     {{#each buttons as |button|}}
       <button type="{{button.type}}" {{#if button.action}}data-action="{{button.action}}" {{/if}}>
         <i class="{{button.icon}}"></i>

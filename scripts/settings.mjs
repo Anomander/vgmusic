@@ -1,4 +1,6 @@
 import { VGMusicConfig } from './app.mjs';
+import { MoodConfigApp } from './mood-config.mjs';
+import { MoodWidget } from './mood-widget.mjs';
 import { CONST } from './config.mjs';
 import { log } from './helpers.mjs';
 
@@ -6,24 +8,6 @@ import { log } from './helpers.mjs';
  * Register module settings and configuration menu
  */
 export function registerSettings() {
-  game.settings.register(CONST.moduleId, CONST.settings.silentCombatMusicMode, {
-    name: 'VGMusic.Settings.SilentCombatMusicMode.Name',
-    hint: 'VGMusic.Settings.SilentCombatMusicMode.Hint',
-    scope: 'world',
-    config: true,
-    type: String,
-    choices: {
-      [CONST.silentModes.highestPriority]: 'VGMusic.Settings.SilentCombatMusicMode.HighestPriority',
-      [CONST.silentModes.lastActor]: 'VGMusic.Settings.SilentCombatMusicMode.LastActor',
-      [CONST.silentModes.area]: 'VGMusic.Settings.SilentCombatMusicMode.Area',
-      [CONST.silentModes.generic]: 'VGMusic.Settings.SilentCombatMusicMode.Generic'
-    },
-    default: CONST.silentModes.highestPriority,
-    onChange: () => {
-      game.vgmusic?.musicController?.playCurrentTrack();
-    }
-  });
-
   game.settings.registerMenu(CONST.moduleId, 'defaultMusicMenu', {
     name: 'VGMusic.Settings.DefaultMusic.Name',
     label: 'VGMusic.Settings.DefaultMusic.Label',
@@ -33,12 +17,55 @@ export function registerSettings() {
     restricted: true
   });
 
+  game.settings.registerMenu(CONST.moduleId, 'moodConfigMenu', {
+    name: 'VGMusic.Settings.MoodConfig.Name',
+    label: 'VGMusic.Settings.MoodConfig.Label',
+    hint: 'VGMusic.Settings.MoodConfig.Hint',
+    icon: 'fas fa-sliders-h',
+    type: MoodConfigApp,
+    restricted: true
+  });
+
   game.settings.register(CONST.moduleId, CONST.settings.defaultMusic, {
     name: 'VGMusic.Settings.DefaultMusic.Name',
     scope: 'world',
     config: false,
     type: Object,
     default: { documentName: 'DefaultMusic', data: { vgmusic: { music: {} } } }
+  });
+
+  game.settings.register(CONST.moduleId, CONST.settings.activeMood, {
+    name: 'VGMusic.Settings.ActiveMood.Name',
+    scope: 'world',
+    config: false,
+    type: String,
+    default: '',
+    onChange: () => {
+      game.vgmusic?.musicController?.playCurrentTrack();
+      if (game.vgmusic?.moodWidget?.rendered) {
+        game.vgmusic.moodWidget.render(false);
+      }
+    }
+  });
+
+  game.settings.register(CONST.moduleId, CONST.settings.configuredMoods, {
+    name: 'VGMusic.Settings.ConfiguredMoods.Name',
+    scope: 'world',
+    config: false,
+    type: Array,
+    default: CONST.defaultMoods,
+    onChange: () => {
+      if (game.vgmusic?.moodWidget?.rendered) {
+        game.vgmusic.moodWidget.render(false);
+      }
+    }
+  });
+
+  game.settings.register(CONST.moduleId, CONST.settings.moodWidgetPosition, {
+    scope: 'client',
+    config: false,
+    type: Object,
+    default: {}
   });
 
   game.settings.register(CONST.moduleId, CONST.settings.fadeDuration, {
@@ -95,6 +122,11 @@ export function registerKeybindings() {
   game.keybindings.register(CONST.moduleId, 'toggleCombatMusic', {
     name: 'VGMusic.Keybindings.ToggleCombatMusic',
     onDown: () => toggleCombatMusic()
+  });
+
+  game.keybindings.register(CONST.moduleId, 'toggleMoodWidget', {
+    name: 'VGMusic.Keybindings.ToggleMoodWidget',
+    onDown: () => MoodWidget.toggle()
   });
 }
 

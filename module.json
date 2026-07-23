@@ -16,6 +16,9 @@
   "esmodules": [
     "scripts/vgmusic.mjs"
   ],
+  "styles": [
+    "styles/vgmusic.css"
+  ],
   "flags": {},
   "id": "vgmusic",
   "languages": [
