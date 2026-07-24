@@ -86,7 +86,8 @@ export class MusicController {
 
     try {
       const contexts = this.getAllCurrentPlaylists();
-      const validContexts = contexts.filter((ctx) => this.filterPlaylists(ctx));
+      const filteredContexts = contexts.filter((ctx) => this.filterPlaylists(ctx));
+      const validContexts = this.excludeAreaWhenCombatApplies(filteredContexts);
       const combat = this.currentCombat;
       validContexts.sort((a, b) => this.sortPlaylists(a, b, combat));
 
@@ -253,6 +254,19 @@ export class MusicController {
     if (context.context === 'combat' && game.settings.get(CONST.moduleId, CONST.settings.suppressCombat)) return false;
     if (context.context === 'area' && game.settings.get(CONST.moduleId, CONST.settings.suppressArea)) return false;
     return true;
+  }
+
+  /**
+   * Combat categorically overrides area rather than competing with it by priority: once any
+   * combat context has passed filterPlaylists (meaning combat is started, unsuppressed, and
+   * configured somewhere), area contexts are dropped entirely instead of being ranked against it.
+   * When no combat context is available, area contexts pass through unchanged.
+   * @param {PlaylistContext[]} contexts - Contexts that already passed filterPlaylists
+   * @returns {PlaylistContext[]} Contexts with area entries removed if a combat context is present
+   */
+  excludeAreaWhenCombatApplies(contexts) {
+    const hasCombatContext = contexts.some((ctx) => ctx.context === 'combat');
+    return hasCombatContext ? contexts.filter((ctx) => ctx.context !== 'area') : contexts;
   }
 
   /**

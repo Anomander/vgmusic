@@ -79,6 +79,33 @@ describe('MusicController', () => {
     });
   });
 
+  describe('excludeAreaWhenCombatApplies', () => {
+    it('drops area contexts when a combat context is present', () => {
+      const area = { context: 'area' };
+      const combat = { context: 'combat' };
+
+      expect(controller.excludeAreaWhenCombatApplies([area, combat])).toEqual([combat]);
+    });
+
+    it('leaves area contexts untouched when no combat context is present', () => {
+      const area = { context: 'area' };
+
+      expect(controller.excludeAreaWhenCombatApplies([area])).toEqual([area]);
+    });
+
+    it('drops every area context when multiple are present alongside one combat context', () => {
+      const sceneArea = { context: 'area', playlist: 'scene' };
+      const globalArea = { context: 'area', playlist: 'global' };
+      const combat = { context: 'combat' };
+
+      expect(controller.excludeAreaWhenCombatApplies([sceneArea, globalArea, combat])).toEqual([combat]);
+    });
+
+    it('returns an empty array unchanged', () => {
+      expect(controller.excludeAreaWhenCombatApplies([])).toEqual([]);
+    });
+  });
+
   describe('sortPlaylists', () => {
     it('prioritizes context entity matching current combatant token', () => {
       const token = { id: 'tok1' };
@@ -284,6 +311,44 @@ describe('MusicController', () => {
       expect(transitionSpy).toHaveBeenCalledWith(targetCtx);
       vi.advanceTimersByTime(350);
       expect(controller.isDebouncing).toBe(false);
+      vi.useRealTimers();
+    });
+
+    it('picks the combat context over a same-priority area context once combat applies (regression: area no longer wins ties)', async () => {
+      vi.useFakeTimers();
+      const areaSound = createMockSound('a1', 'Area Sound');
+      const combatSound = createMockSound('c1', 'Combat Sound');
+      const areaPlaylist = createMockPlaylist('area-pl', 'Tavern Ambience', [areaSound]);
+      const combatPlaylist = createMockPlaylist('combat-pl', 'Boss Fight', [combatSound]);
+      const areaCtx = { playlist: areaPlaylist, tracks: [areaSound], context: 'area', priority: 0 };
+      const combatCtx = { playlist: combatPlaylist, tracks: [combatSound], context: 'combat', priority: 0 };
+
+      // Both tied at priority 0, area pushed before combat — reproduces the pre-fix ordering
+      vi.spyOn(controller, 'getAllCurrentPlaylists').mockReturnValue([areaCtx, combatCtx]);
+      vi.spyOn(controller, 'filterPlaylists').mockReturnValue(true);
+      const transitionSpy = vi.spyOn(controller, 'transitionToContext').mockResolvedValue();
+
+      await controller.playCurrentTrack();
+
+      expect(transitionSpy).toHaveBeenCalledWith(combatCtx);
+      vi.advanceTimersByTime(350);
+      vi.useRealTimers();
+    });
+
+    it('falls back to area when no combat context is available, even during combat', async () => {
+      vi.useFakeTimers();
+      const areaSound = createMockSound('a1', 'Area Sound');
+      const areaPlaylist = createMockPlaylist('area-pl', 'Tavern Ambience', [areaSound]);
+      const areaCtx = { playlist: areaPlaylist, tracks: [areaSound], context: 'area', priority: 0 };
+
+      vi.spyOn(controller, 'getAllCurrentPlaylists').mockReturnValue([areaCtx]);
+      vi.spyOn(controller, 'filterPlaylists').mockReturnValue(true);
+      const transitionSpy = vi.spyOn(controller, 'transitionToContext').mockResolvedValue();
+
+      await controller.playCurrentTrack();
+
+      expect(transitionSpy).toHaveBeenCalledWith(areaCtx);
+      vi.advanceTimersByTime(350);
       vi.useRealTimers();
     });
 
