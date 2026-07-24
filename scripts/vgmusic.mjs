@@ -15,8 +15,10 @@ import {
   handleTokenConfigRender,
   handleUpdateActor,
   handleUpdateCombat,
+  handleUpdateCombatant,
   handleUpdateScene,
-  handleUpdateToken
+  handleUpdateToken,
+  handleUserConnected
 } from './hooks.mjs';
 
 Hooks.once('init', async () => {
@@ -48,4 +50,6 @@ Hooks.on('updateActor', handleUpdateActor);
 Hooks.on('updateToken', handleUpdateToken);
 Hooks.on('createCombatant', handleCreateCombatant);
 Hooks.on('deleteCombatant', handleDeleteCombatant);
+Hooks.on('updateCombatant', handleUpdateCombatant);
 Hooks.on('renderTokenApplication', handleTokenConfigRender);
+Hooks.on('userConnected', handleUserConnected);

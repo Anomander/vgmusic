@@ -8,6 +8,8 @@ import {
   handleDeleteCombat,
   handleCreateCombatant,
   handleDeleteCombatant,
+  handleUpdateCombatant,
+  handleUserConnected,
   handleCanvasReady,
   handleUpdateScene,
   handleUpdateActor,
@@ -68,6 +70,13 @@ describe('hooks.mjs', () => {
     });
   });
 
+  describe('handleUserConnected', () => {
+    it('calls playCurrentTrack on any GM connect/disconnect so headship handoff is picked up', () => {
+      handleUserConnected({ id: 'gm2', isGM: true }, false);
+      expect(mockController.playCurrentTrack).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('handleCreateCombatant', () => {
     it('calls playCurrentTrack when parent combat is started', () => {
       const combatant = { parent: { started: true } };
@@ -92,6 +101,26 @@ describe('hooks.mjs', () => {
     it('does NOT call playCurrentTrack when parent combat is not started', () => {
       const combatant = { parent: { started: false } };
       handleDeleteCombatant(combatant);
+      expect(mockController.playCurrentTrack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleUpdateCombatant', () => {
+    it('calls playCurrentTrack when defeated status changes and parent combat is started', () => {
+      const combatant = { parent: { started: true } };
+      handleUpdateCombatant(combatant, { defeated: true });
+      expect(mockController.playCurrentTrack).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call playCurrentTrack when parent combat is not started', () => {
+      const combatant = { parent: { started: false } };
+      handleUpdateCombatant(combatant, { defeated: true });
+      expect(mockController.playCurrentTrack).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call playCurrentTrack for unrelated updates', () => {
+      const combatant = { parent: { started: true } };
+      handleUpdateCombatant(combatant, { initiative: 15 });
       expect(mockController.playCurrentTrack).not.toHaveBeenCalled();
     });
   });
@@ -175,6 +204,17 @@ describe('hooks.mjs', () => {
 
     it('gracefully handles missing sounds tools object', () => {
       expect(() => getSceneControlButtons({})).not.toThrow();
+    });
+
+    it('does not populate tools for non-GM users', () => {
+      game.user = { isGM: false };
+      const controls = { sounds: { tools: {} } };
+
+      getSceneControlButtons(controls);
+
+      expect(controls.sounds.tools['suppress-area-music']).toBeUndefined();
+      expect(controls.sounds.tools['suppress-combat-music']).toBeUndefined();
+      expect(controls.sounds.tools['mood-widget']).toBeUndefined();
     });
   });
 

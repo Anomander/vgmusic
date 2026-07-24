@@ -137,23 +137,30 @@ export function registerSettings() {
  * Register keybindings
  */
 export function registerKeybindings() {
+  // All four actions either mutate world-scoped settings or open GM-only management
+  // apps, so every binding is restricted - a player pressing one should see nothing
+  // happen, not a swallowed permission error.
   game.keybindings.register(CONST.moduleId, 'toggleAreaMusic', {
     name: 'VGMusic.Keybindings.ToggleAreaMusic',
+    restricted: true,
     onDown: () => toggleAreaMusic()
   });
 
   game.keybindings.register(CONST.moduleId, 'toggleCombatMusic', {
     name: 'VGMusic.Keybindings.ToggleCombatMusic',
+    restricted: true,
     onDown: () => toggleCombatMusic()
   });
 
   game.keybindings.register(CONST.moduleId, 'toggleMoodWidget', {
     name: 'VGMusic.Keybindings.ToggleMoodWidget',
+    restricted: true,
     onDown: () => MoodWidget.toggle()
   });
 
   game.keybindings.register(CONST.moduleId, 'togglePlaylistTree', {
     name: 'VGMusic.Keybindings.TogglePlaylistTree',
+    restricted: true,
     onDown: () => PlaylistTreeApp.toggle()
   });
 }

@@ -47,6 +47,55 @@ describe('MoodConfigApp', () => {
       expect(mockApp.close).toHaveBeenCalled();
     });
 
+    it('preserves an existing mood id across a label rename instead of regenerating it', async () => {
+      const mockApp = { close: vi.fn() };
+
+      const formData = {
+        object: {
+          'moods.0.id': 'boss',
+          'moods.0.label': 'Final Boss',
+          'moods.0.icon': 'fas fa-skull',
+          'moods.0.color': '#f44336'
+        }
+      };
+
+      await MoodConfigApp.formHandler.call(mockApp, new Event('submit'), null, formData);
+
+      expect(game.settings.set).toHaveBeenCalledWith(
+        CONST.moduleId,
+        CONST.settings.configuredMoods,
+        [{ id: 'boss', label: 'Final Boss', icon: 'fas fa-skull', color: '#f44336' }]
+      );
+    });
+
+    it('generates a fresh id from the label for a new row with no id', async () => {
+      const mockApp = { close: vi.fn() };
+
+      const formData = {
+        object: {
+          'moods.0.id': 'boss',
+          'moods.0.label': 'Boss',
+          'moods.0.icon': 'fas fa-skull',
+          'moods.0.color': '#f44336',
+          'moods.1.id': '',
+          'moods.1.label': 'Stealth',
+          'moods.1.icon': 'fas fa-user-ninja',
+          'moods.1.color': '#9c27b0'
+        }
+      };
+
+      await MoodConfigApp.formHandler.call(mockApp, new Event('submit'), null, formData);
+
+      expect(game.settings.set).toHaveBeenCalledWith(
+        CONST.moduleId,
+        CONST.settings.configuredMoods,
+        [
+          { id: 'boss', label: 'Boss', icon: 'fas fa-skull', color: '#f44336' },
+          { id: 'stealth', label: 'Stealth', icon: 'fas fa-user-ninja', color: '#9c27b0' }
+        ]
+      );
+    });
+
     it('handles settings.set error rejection gracefully', async () => {
       const mockApp = { close: vi.fn() };
       game.settings.set.mockRejectedValueOnce(new Error('Permission denied'));
@@ -83,6 +132,26 @@ describe('MoodConfigApp', () => {
       expect(mockApp.moods).toHaveLength(1);
       expect(mockApp.moods[0].id).toBe('m2');
       expect(mockApp.render).toHaveBeenCalledWith(false);
+    });
+
+    it('warns that overrides referencing the deleted mood id will be orphaned', () => {
+      const mockApp = { moods: [{ id: 'boss', label: 'Boss' }], render: vi.fn() };
+      const event = { preventDefault: vi.fn() };
+      const target = { dataset: { index: '0' } };
+
+      MoodConfigApp.handleDeleteMood.call(mockApp, event, target);
+
+      expect(ui.notifications.warn).toHaveBeenCalledWith(expect.stringContaining('Boss'));
+    });
+
+    it('does not warn when the removed row never had an id (unsaved new row)', () => {
+      const mockApp = { moods: [{ id: '', label: 'New Mood' }], render: vi.fn() };
+      const event = { preventDefault: vi.fn() };
+      const target = { dataset: { index: '0' } };
+
+      MoodConfigApp.handleDeleteMood.call(mockApp, event, target);
+
+      expect(ui.notifications.warn).not.toHaveBeenCalled();
     });
   });
 
@@ -125,6 +194,16 @@ describe('MoodWidget', () => {
       expect(game.settings.set).toHaveBeenCalledWith(CONST.moduleId, CONST.settings.activeMood, '');
     });
 
+    it('does nothing for a non-GM user', async () => {
+      game.user = { isGM: false };
+      const event = { preventDefault: vi.fn() };
+      const target = { closest: vi.fn().mockReturnValue({ dataset: { moodId: 'boss' } }) };
+
+      await MoodWidget.handleSetMood(event, target);
+
+      expect(game.settings.set).not.toHaveBeenCalled();
+    });
+
     it('refreshes open windows registered in ui.windows when activeMood setting changes', () => {
       registerSettings();
       const mockConfigApp = { constructor: { name: 'VGMusicConfig' }, rendered: true, selectedMood: '', render: vi.fn() };
@@ -139,6 +218,17 @@ describe('MoodWidget', () => {
       expect(mockConfigApp.selectedMood).toBe('boss');
       expect(mockConfigApp.render).toHaveBeenCalledWith(false);
       expect(mockTreeApp.render).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe('open', () => {
+    it('does not create or render the widget for a non-GM user', () => {
+      game.user = { isGM: false };
+      game.vgmusic = { moodWidget: null };
+
+      MoodWidget.open();
+
+      expect(game.vgmusic.moodWidget).toBeNull();
     });
   });
 

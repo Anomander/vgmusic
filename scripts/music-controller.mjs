@@ -11,6 +11,7 @@ export class MusicController {
     this.currentContext = null;
     this.isDebouncing = false;
     this._savedPlaylistPositions = new Map();
+    this._managedSoundIds = new Set();
     this._audioUnlockRegistered = false;
     this._transitionSequenceId = 0;
     this._debounceTimer = null;
@@ -151,9 +152,12 @@ export class MusicController {
       }
     }
 
-    // Fade out current playing tracks (excluding targetTracks)
+    // Fade out current playing tracks (excluding targetTracks). Only ever touches sounds
+    // this controller itself previously started — a GM's manually-started ambience or
+    // jukebox playlist is left alone rather than being silently cut off.
     for (const activeSound of game.playlists.playing.flatMap((p) => Array.from(p.sounds.values()))) {
       if (targetTrackIds.has(activeSound.id)) continue;
+      if (!this._managedSoundIds.has(activeSound.id)) continue;
       if (activeSound.playing) {
         const soundObj = activeSound.sound || activeSound;
         if (fadeDurationMs > 0 && typeof soundObj?.fade === 'function') {
@@ -172,24 +176,30 @@ export class MusicController {
 
     this.currentContext = targetContext;
     this.currentTracks = targetTracks;
+    for (const track of targetTracks) this._managedSoundIds.add(track.id);
     this._refreshUI();
 
     for (const targetTrack of targetTracks) {
       if (this._transitionSequenceId !== transitionId) return;
+
+      // A track that's already audibly playing needs no action - re-triggering playback
+      // here is what causes tracks to audibly restart from the beginning on every
+      // unrelated config change that happens to re-resolve to the same winning context.
+      if (targetTrack.playing === true || targetTrack.sound?.playing === true) {
+        log(3, `Track '${targetTrack.name}' is already playing; leaving it uninterrupted.`);
+        continue;
+      }
+
       const savedPosition = this.getPlaylistData(targetContext.scopeEntity, targetTrack);
       const originalVolume = targetTrack.volume ?? targetTrack.sound?.volume ?? 1.0;
       log(3, `Preparing to play track '${targetTrack.name}' from position ${savedPosition}s (targetVolume: ${originalVolume}, fadeIn: ${fadeDurationMs > 0})`);
 
-      if (fadeDurationMs > 0) {
-        await targetTrack.update({ offset: savedPosition });
-        if (this._transitionSequenceId !== transitionId) return;
-        await this.playTrack(targetTrack);
-        this._fadeInWhenReady(targetTrack, fadeDurationMs, originalVolume);
-      } else {
-        await targetTrack.update({ offset: savedPosition });
-        if (this._transitionSequenceId !== transitionId) return;
-        await this.playTrack(targetTrack);
-      }
+      // pausedTime is the schema field PlaylistSound/Playlist#playSound reads to resume
+      // playback at a given offset; a plain 'offset' field is not persisted or honored.
+      await targetTrack.update({ pausedTime: savedPosition });
+      if (this._transitionSequenceId !== transitionId) return;
+      await this.playTrack(targetTrack);
+      if (fadeDurationMs > 0) this._fadeInWhenReady(targetTrack, fadeDurationMs, originalVolume);
     }
   }
 
@@ -224,6 +234,7 @@ export class MusicController {
     }
     if (combat?.combatant) {
       for (const combatant of combat.combatants) {
+        if (combatant.isDefeated) continue;
         const musicSource = this._getCombatantMusicSource(combatant.token, combatant.actor);
         if (musicSource) {
           const ctx = PlaylistContext.fromDocument(musicSource, 'combat', combat, activeMood);

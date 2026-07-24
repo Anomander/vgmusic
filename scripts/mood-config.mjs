@@ -101,7 +101,13 @@ export class MoodConfigApp extends HandlebarsApplicationMixin(ApplicationV2) {
     event.preventDefault();
     const index = parseInt(target.dataset.index);
     if (!isNaN(index) && index >= 0 && index < this.moods.length) {
-      this.moods.splice(index, 1);
+      const [removed] = this.moods.splice(index, 1);
+      // Saving without this mood leaves any scene/token/global overrides that reference
+      // its id in place but unreachable; warn rather than silently sweep world documents.
+      if (removed?.id) {
+        const label = removed.label?.startsWith('VGMusic.') ? game.i18n.localize(removed.label) : removed.label;
+        ui.notifications?.warn(`${game.i18n.localize('VGMusic.MoodConfig.DeleteOrphanWarning')}: ${label || removed.id}`);
+      }
       this.render(false);
     }
   }
@@ -125,11 +131,14 @@ export class MoodConfigApp extends HandlebarsApplicationMixin(ApplicationV2) {
     const seenIds = new Set();
     const cleanedMoods = rawMoods.map((m) => {
       const label = (m.label || '').trim();
-      let generatedId = canonicalizeId(label) || `mood-${Date.now()}`;
-      let uniqueId = generatedId;
+      // Preserve an existing row's id across renames so scene/token/global overrides
+      // keyed by that id keep resolving; only mint a fresh id for newly-added rows.
+      const existingId = (m.id || '').trim();
+      const baseId = existingId || canonicalizeId(label) || `mood-${Date.now()}`;
+      let uniqueId = baseId;
       let suffix = 2;
       while (seenIds.has(uniqueId)) {
-        uniqueId = `${generatedId}-${suffix}`;
+        uniqueId = `${baseId}-${suffix}`;
         suffix++;
       }
       seenIds.add(uniqueId);

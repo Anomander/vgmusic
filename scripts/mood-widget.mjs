@@ -251,6 +251,7 @@ export class MoodWidget extends HandlebarsApplicationMixin(ApplicationV2) {
 
   static async handleSetMood(event, target) {
     event.preventDefault();
+    if (!game.user.isGM) return;
     const button = target.closest('[data-mood-id]') || target;
     const moodId = button.dataset?.moodId ?? '';
     const currentActive = game.settings.get(CONST.moduleId, CONST.settings.activeMood) || '';
@@ -338,7 +339,7 @@ export class MoodWidget extends HandlebarsApplicationMixin(ApplicationV2) {
    * Open the widget and persist the open state
    */
   static open() {
-    if (!game.vgmusic) return;
+    if (!game.vgmusic || !game.user.isGM) return;
     if (game.vgmusic.moodWidget?.rendered) return;
     game.vgmusic.moodWidget = new MoodWidget();
     game.vgmusic.moodWidget.render(true);

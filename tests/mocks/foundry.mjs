@@ -146,18 +146,25 @@ export function setMockSetting(moduleId, key, value) {
 }
 
 export function createMockSound(id, name, overrides = {}) {
-  return {
+  const sound = {
     id,
     name,
     playing: false,
     volume: 1.0,
+    pausedTime: null,
     sound: { currentTime: 0, loaded: true, playing: false, fade: vi.fn(() => Promise.resolve()), stop: vi.fn(), volume: 1.0 },
     parent: { playSound: vi.fn(() => Promise.resolve()), stopSound: vi.fn(() => Promise.resolve()) },
     play: vi.fn(() => Promise.resolve()),
-    stop: vi.fn(),
-    update: vi.fn(() => Promise.resolve()),
-    ...overrides
+    stop: vi.fn()
   };
+  // Models Foundry document.update(): merges the patch into the document
+  // in place so assertions can inspect resulting field values, not just call args.
+  sound.update = vi.fn((data = {}) => {
+    Object.assign(sound, data);
+    return Promise.resolve(sound);
+  });
+  Object.assign(sound, overrides);
+  return sound;
 }
 
 export function createMockPlaylist(id, name, sounds = [], mode = 0) {

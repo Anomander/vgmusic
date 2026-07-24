@@ -11,6 +11,7 @@ const _loc = (key) => game.i18n.localize(key);
  */
 export function getSceneControlButtons(controls) {
   try {
+    if (!game.user.isGM) return;
     if (controls.sounds && controls.sounds.tools) {
       controls.sounds.tools['suppress-area-music'] = {
         name: 'suppress-area-music',
@@ -126,9 +127,29 @@ export function handleDeleteCombatant(combatant) {
 }
 
 /**
+ * Handle combatant updates to refresh music when defeated status changes,
+ * since a defeated combatant's theme should stop competing for priority
+ * @param {object} combatant - The updated combatant
+ * @param {object} updateData - The update data
+ */
+export function handleUpdateCombatant(combatant, updateData) {
+  if ('defeated' in updateData && combatant.parent?.started) game.vgmusic?.musicController?.playCurrentTrack();
+}
+
+/**
  * Handle canvas ready to start music
  */
 export function handleCanvasReady() {
+  game.vgmusic?.musicController?.playCurrentTrack();
+}
+
+/**
+ * Handle GM connect/disconnect to hand off playback control. isHeadGM() picks the
+ * first active GM by id, so headship can change on either a connect or a disconnect;
+ * re-running playCurrentTrack on every client is safe since it internally no-ops for
+ * anyone who isn't the current head GM.
+ */
+export function handleUserConnected() {
   game.vgmusic?.musicController?.playCurrentTrack();
 }
 

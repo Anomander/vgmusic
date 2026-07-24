@@ -7,6 +7,7 @@
       <div class="mood-drag-handle">
         <i class="fas fa-grip-vertical"></i>
       </div>
+      <input type="hidden" name="moods.{{@index}}.id" value="{{this.id}}" />
       <input type="text" name="moods.{{@index}}.label" value="{{this.displayLabel}}" placeholder="Mood Name" class="mood-label-input" required />
       
       <select name="moods.{{@index}}.icon" class="mood-icon-select">

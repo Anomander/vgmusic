@@ -36,6 +36,7 @@
   "VGMusic.MoodConfig.Title": "Mood Configuration",
   "VGMusic.MoodConfig.Hint": "Configure custom music moods, icons, and display colors for your world music.",
   "VGMusic.MoodConfig.AddMood": "Add Mood",
+  "VGMusic.MoodConfig.DeleteOrphanWarning": "Saving will orphan any existing overrides configured for this mood",
   "VGMusic.Mood.Calm": "Calm",
   "VGMusic.Mood.Tense": "Tense",
   "VGMusic.Mood.Boss": "Boss",

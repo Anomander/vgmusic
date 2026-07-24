@@ -23,7 +23,8 @@ Video Game Music adds context-aware music to FoundryVTT. It automatically switch
 - **Area & Combat Music** — assign playlists per-scene for exploration and combat
 - **Per-Token Themes** — give individual tokens their own combat music via Token Config
 - **Priority System** — control which music wins when multiple sources apply
-- **Fallback Modes** — configurable behavior when the active combatant has no theme
+- **Moods** — define custom moods (calm, tense, boss, stealth, victory, or your own) and layer mood-specific playlist overrides on top of scene, token, and world-default music; switch the active mood from a dockable Mood Widget
+- **Playlist Hierarchy Tree** — a manager window for reviewing and editing area/combat/mood assignments across every scene and the world defaults in one place
 - **Crossfade** — adjustable fade duration for smooth transitions between tracks
 - **Position Memory** — tracks resume from where they were interrupted
 - **Suppression** — toggle area or combat music on/off with hotkeys or scene controls
@@ -42,7 +43,8 @@ https://github.com/Sayshal/vgmusic/releases/latest/download/module.json
 2. **Token music** — open Token Config (or Prototype Token), find the music button in the Identity tab to assign combat themes
 3. **Linked token override** — linked tokens can optionally use their own music instead of the actor's prototype config
 4. **Default music** — set a world-level fallback in module settings
-5. **Settings** — configure fade duration and suppression hotkeys
+5. **Moods** — configure custom moods and per-mood overrides from the Configure Moods settings menu, or manage everything at once from the Playlist Hierarchy Tree
+6. **Settings** — configure fade duration and suppression hotkeys
 
 ## Settings
 

@@ -405,6 +405,9 @@ describe('MusicController', () => {
       const playingSound = createMockSound('old1', 'Old Track', { playing: true });
       const playingPlaylist = createMockPlaylist('oldP', 'Old Playlist', [playingSound]);
       game.playlists.playing = [playingPlaylist];
+      // Establish 'old1' as a track this controller itself started, matching real usage
+      // where a transition always follows an earlier one rather than pre-existing audio.
+      controller._managedSoundIds.add('old1');
 
       const newSound = createMockSound('new1', 'New Track');
       const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
@@ -427,6 +430,7 @@ describe('MusicController', () => {
       const playingSound = createMockSound('old1', 'Old Track', { playing: true });
       const playingPlaylist = createMockPlaylist('oldP', 'Old Playlist', [playingSound]);
       game.playlists.playing = [playingPlaylist];
+      controller._managedSoundIds.add('old1');
 
       const newSound = createMockSound('new1', 'New Track');
       const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
@@ -436,6 +440,76 @@ describe('MusicController', () => {
       await controller.transitionToContext(targetCtx);
 
       expect(stopTrackSpy).toHaveBeenCalledWith(playingSound);
+    });
+
+    it('does not touch a playing track the controller never started (e.g. a GM-started ambience playlist)', async () => {
+      setMockSetting('vgmusic', 'fadeDuration', 2);
+
+      const unmanagedSound = createMockSound('ambience1', 'Rain Ambience', { playing: true });
+      const unmanagedPlaylist = createMockPlaylist('ambP', 'Ambience Playlist', [unmanagedSound]);
+      game.playlists.playing = [unmanagedPlaylist];
+      // Deliberately not added to controller._managedSoundIds - simulates audio the
+      // GM started manually, outside of VGMusic's control.
+
+      const newSound = createMockSound('new1', 'New Track');
+      const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
+      const targetCtx = { playlist: newPlaylist, tracks: [newSound], scopeEntity: null };
+
+      const stopTrackSpy = vi.spyOn(controller, 'stopTrack');
+      await controller.transitionToContext(targetCtx);
+
+      expect(unmanagedSound.sound.fade).not.toHaveBeenCalled();
+      expect(stopTrackSpy).not.toHaveBeenCalledWith(unmanagedSound);
+      expect(unmanagedSound.playing).toBe(true);
+    });
+
+    it('adds newly started target tracks to the managed set so a later transition can stop them', async () => {
+      const trackA = createMockSound('a1', 'Track A');
+      const playlistA = createMockPlaylist('pA', 'Playlist A', [trackA]);
+      const ctxA = { playlist: playlistA, tracks: [trackA], scopeEntity: null };
+
+      await controller.transitionToContext(ctxA);
+
+      expect(controller._managedSoundIds.has('a1')).toBe(true);
+    });
+
+    it('does not restart a target track that is already playing (redundant transition to the same context)', async () => {
+      const areaSound = createMockSound('area1', 'Area Track', { playing: true });
+      const areaPlaylist = createMockPlaylist('areaP', 'Area Playlist', [areaSound]);
+      const areaCtx = { playlist: areaPlaylist, tracks: [areaSound], scopeEntity: null };
+
+      const playTrackSpy = vi.spyOn(controller, 'playTrack').mockResolvedValue();
+
+      await controller.transitionToContext(areaCtx);
+
+      expect(playTrackSpy).not.toHaveBeenCalled();
+      expect(areaSound.update).not.toHaveBeenCalled();
+    });
+
+    it('does not restart a target track whose nested sound object reports playing, even if the top-level flag lags', async () => {
+      const areaSound = createMockSound('area1', 'Area Track', { playing: false, sound: { currentTime: 12, loaded: true, playing: true, fade: vi.fn(() => Promise.resolve()), stop: vi.fn(), volume: 1.0 } });
+      const areaPlaylist = createMockPlaylist('areaP', 'Area Playlist', [areaSound]);
+      const areaCtx = { playlist: areaPlaylist, tracks: [areaSound], scopeEntity: null };
+
+      const playTrackSpy = vi.spyOn(controller, 'playTrack').mockResolvedValue();
+
+      await controller.transitionToContext(areaCtx);
+
+      expect(playTrackSpy).not.toHaveBeenCalled();
+      expect(areaSound.update).not.toHaveBeenCalled();
+    });
+
+    it('still starts playback normally for a target track that is not currently playing', async () => {
+      const newSound = createMockSound('new1', 'New Track');
+      const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
+      const targetCtx = { playlist: newPlaylist, tracks: [newSound], scopeEntity: null };
+
+      const playTrackSpy = vi.spyOn(controller, 'playTrack').mockResolvedValue();
+
+      await controller.transitionToContext(targetCtx);
+
+      expect(playTrackSpy).toHaveBeenCalledWith(newSound);
+      expect(newSound.update).toHaveBeenCalledWith({ pausedTime: 0 });
     });
 
     it('triggers _refreshUI and re-renders open playlistTree and moodWidget applications', async () => {
@@ -450,6 +524,31 @@ describe('MusicController', () => {
 
       expect(treeRender).toHaveBeenCalledWith(false);
       expect(widgetRender).toHaveBeenCalledWith(false);
+    });
+
+    it('resumes a track at its saved position via pausedTime, not offset', async () => {
+      const scopeEntity = { id: 'scene1', documentName: 'Scene' };
+      const newSound = createMockSound('new1', 'New Track');
+      const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
+      const targetCtx = { playlist: newPlaylist, tracks: [newSound], scopeEntity };
+
+      controller._savedPlaylistPositions.set('Scene_scene1', { new1: 42.5 });
+
+      await controller.transitionToContext(targetCtx);
+
+      expect(newSound.update).toHaveBeenCalledWith({ pausedTime: 42.5 });
+      expect(newSound.pausedTime).toBe(42.5);
+      expect(newSound.update).not.toHaveBeenCalledWith(expect.objectContaining({ offset: expect.anything() }));
+    });
+
+    it('sets pausedTime to 0 when no saved position exists for a fresh track', async () => {
+      const newSound = createMockSound('new1', 'New Track');
+      const newPlaylist = createMockPlaylist('newP', 'New Playlist', [newSound]);
+      const targetCtx = { playlist: newPlaylist, tracks: [newSound], scopeEntity: null };
+
+      await controller.transitionToContext(targetCtx);
+
+      expect(newSound.update).toHaveBeenCalledWith({ pausedTime: 0 });
     });
   });
 
@@ -492,6 +591,52 @@ describe('MusicController', () => {
 
       const contexts = controller.getAllCurrentPlaylists();
       expect(contexts.map((c) => c.playlist)).toContain(defaultPlaylist);
+    });
+
+    it('excludes a defeated combatant from context resolution entirely', () => {
+      const themePlaylist = createMockPlaylist('bossP', 'Boss Theme', []);
+      game.playlists.get = vi.fn((id) => (id === 'bossP' ? themePlaylist : null));
+
+      function PrototypeToken() {
+        this.flags = { vgmusic: { music: { combat: { playlist: 'bossP', priority: 20 } } } };
+      }
+      const defeatedToken = new PrototypeToken();
+      game.combats = {
+        active: {
+          started: true,
+          combatant: { token: defeatedToken },
+          combatants: [{ token: defeatedToken, isDefeated: true }]
+        }
+      };
+
+      const contexts = controller.getAllCurrentPlaylists();
+      expect(contexts.map((c) => c.playlist)).not.toContain(themePlaylist);
+    });
+
+    it('includes a non-defeated combatant alongside a defeated one', () => {
+      const bossPlaylist = createMockPlaylist('bossP', 'Boss Theme', []);
+      const allyPlaylist = createMockPlaylist('allyP', 'Ally Theme', []);
+      game.playlists.get = vi.fn((id) => (id === 'bossP' ? bossPlaylist : id === 'allyP' ? allyPlaylist : null));
+
+      function PrototypeToken(playlistId) {
+        this.flags = { vgmusic: { music: { combat: { playlist: playlistId, priority: 20 } } } };
+      }
+      const defeatedToken = new PrototypeToken('bossP');
+      const aliveToken = new PrototypeToken('allyP');
+      game.combats = {
+        active: {
+          started: true,
+          combatant: { token: aliveToken },
+          combatants: [
+            { token: defeatedToken, isDefeated: true },
+            { token: aliveToken, isDefeated: false }
+          ]
+        }
+      };
+
+      const contexts = controller.getAllCurrentPlaylists();
+      expect(contexts.map((c) => c.playlist)).not.toContain(bossPlaylist);
+      expect(contexts.map((c) => c.playlist)).toContain(allyPlaylist);
     });
   });
 
